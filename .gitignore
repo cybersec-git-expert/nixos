@@ -1,0 +1,8 @@
+#
+# Keep this repo minimal: track only NixOS configuration under ./nixos
+#
+*
+!.gitignore
+!README.md
+!nixos/
+!nixos/**
