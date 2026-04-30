@@ -13,6 +13,8 @@ import "../" // Assuming scaler.qml is available here
 ShellRoot {
     id: root
     MatugenColors { id: _theme }
+    // Same policy as rofi-power-menu.sh (UPS + NixOS PATH) — see hypr/scripts/power-action.sh
+    readonly property string powerActionScript: Quickshell.env("HOME") + "/.config/hypr/scripts/power-action.sh"
     readonly property color base: _theme.base
     readonly property color crust: _theme.crust
     readonly property color mantle: _theme.mantle
@@ -67,17 +69,22 @@ ShellRoot {
 
     Process {
         id: suspendProcess
-        command: ["systemctl", "suspend"]
+        command: ["bash", root.powerActionScript, "suspend"]
+    }
+
+    Process {
+        id: hibernateProcess
+        command: ["bash", root.powerActionScript, "hibernate"]
     }
 
     Process {
         id: poweroffProcess
-        command: ["systemctl", "poweroff"]
+        command: ["bash", root.powerActionScript, "poweroff"]
     }
 
     Process {
         id: reloadProcess
-        command: ["systemctl", "reboot"]
+        command: ["bash", root.powerActionScript, "reboot"]
     }
 
     WlSessionLock {
@@ -1004,6 +1011,28 @@ ShellRoot {
                                 onClicked: {
                                     screenRoot.powerMenuOpen = false;
                                     reloadProcess.running = true;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true; Layout.preferredHeight: 48 * screenRoot.sc; Layout.leftMargin: 10 * screenRoot.sc; Layout.rightMargin: 10 * screenRoot.sc; radius: 12 * screenRoot.sc
+                            color: maHibernate.containsMouse ? Qt.rgba(root.green.r, root.green.g, root.green.b, 0.12) : "transparent"
+                            scale: maHibernate.pressed ? 0.95 : (maHibernate.containsMouse ? 1.02 : 1.0)
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 16 * screenRoot.sc; anchors.rightMargin: 16 * screenRoot.sc; spacing: 0
+                                Text { text: "󰤄"; font.family: "Iosevka Nerd Font"; font.pixelSize: 18 * screenRoot.sc; color: maHibernate.containsMouse ? root.green : Qt.rgba(root.green.r, root.green.g, root.green.b, 0.55); Behavior on color { ColorAnimation { duration: 200 } } }
+                                Item { Layout.fillWidth: true }
+                                Text { text: "Hibernate"; font.family: "JetBrains Mono"; font.pixelSize: 15 * screenRoot.sc; font.weight: Font.Medium; color: maHibernate.containsMouse ? root.green : Qt.rgba(root.green.r, root.green.g, root.green.b, 0.55); Behavior on color { ColorAnimation { duration: 200 } } }
+                            }
+                            MouseArea {
+                                id: maHibernate; anchors.fill: parent; hoverEnabled: true;
+                                onClicked: {
+                                    screenRoot.powerMenuOpen = false;
+                                    hibernateProcess.running = true;
                                 }
                             }
                         }

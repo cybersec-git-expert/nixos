@@ -151,7 +151,10 @@ ups_stats() {
                     _flag="/tmp/.ups_shutdown_triggered"
                     if [[ ! -f "$_flag" ]]; then
                         touch "$_flag"
-                        systemctl poweroff
+                        # Use shared helper so systemctl is on PATH in minimal poller environments (NixOS).
+                        [[ -n "${HOME:-}" ]] && [[ -x "${HOME}/.config/hypr/scripts/power-action.sh" ]] && \
+                            "${HOME}/.config/hypr/scripts/power-action.sh" poweroff || \
+                            PATH="${PATH}:/run/current-system/sw/bin" systemctl poweroff
                     fi
                 else
                     rm -f "/tmp/.ups_shutdown_triggered"
