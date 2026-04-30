@@ -1,0 +1,10 @@
+{
+  "uiScale": 0.75,
+  "openGuideAtStartup": true,
+  "topbarHelpIcon": true,
+  "wallpaperDir": "/home/cyberexpert/Pictures/Wallpapers",
+  "language": "us",
+  "kbOptions": "grp:alt_shift_toggle",
+  "workspaceCount": 12,
+  "workspaceCountAuto": true
+}

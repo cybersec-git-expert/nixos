@@ -1,0 +1,94 @@
+/* Hacker Power Menu Theme - Matching Hyprlock Hacker Style */
+
+* {
+    bg-col:  #101010;
+    bg-col-light: #202020;
+    border-col: #ffffff33;
+    selected-col: #ffffff22;
+    blue: #ffffff;
+    fg-col: #ffffff;
+    fg-col2: #ffffffcc;
+    grey: #888888;
+
+    width: 400;
+    font: "JetBrainsMono Nerd Font 14";
+}
+
+element-text, element-icon , mode-switcher {
+    background-color: inherit;
+    text-color: inherit;
+}
+
+window {
+    height: 320px;
+    border: 2px;
+    border-color: @border-col;
+    background-color: @bg-col;
+    border-radius: 8px;
+}
+
+mainbox {
+    background-color: @bg-col;
+    children: [ "message", "listview" ];
+    padding: 20px;
+    spacing: 15px;
+}
+
+message {
+    background-color: @bg-col;
+    padding: 10px;
+    border: 1px;
+    border-color: @border-col;
+    border-radius: 4px;
+}
+
+textbox {
+    background-color: @bg-col;
+    text-color: @fg-col;
+    vertical-align: 0.5;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Bold 16";
+}
+
+listview {
+    background-color: @bg-col;
+    columns: 1;
+    lines: 4;
+    spacing: 8px;
+    cycle: false;
+    dynamic: true;
+    layout: vertical;
+}
+
+element {
+    background-color: @bg-col;
+    text-color: @fg-col;
+    orientation: horizontal;
+    border-radius: 4px;
+    padding: 15px;
+    border: 1px;
+    border-color: @border-col;
+}
+
+element-icon {
+    background-color: inherit;
+    text-color: inherit;
+    horizontal-align: 0.5;
+    vertical-align: 0.5;
+    size: 24px;
+}
+
+element-text {
+    background-color: inherit;
+    text-color: inherit;
+    expand: true;
+    horizontal-align: 0.0;
+    vertical-align: 0.5;
+    margin: 0px 0px 0px 10px;
+}
+
+element selected {
+    background-color: @selected-col;
+    text-color: @fg-col;
+    border-color: @blue;
+}

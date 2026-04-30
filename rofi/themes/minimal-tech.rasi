@@ -1,0 +1,84 @@
+/**
+ * Minimal Tech Theme for Rofi (No Borders)
+ * Aesthetic: Clean, Dark, Glassy, Monochrome
+ */
+
+* {
+    /* Colors */
+    background:     #0d0f11CC;  /* Dark background with transparency */
+    background-alt: #1a1c1eFF;  /* Slightly lighter for selection */
+    foreground:     #FFFFFFFF;
+    selected:       #FFFFFF22;  /* Subtle white highlight */
+    
+    /* Global Properties */
+    background-color: transparent;
+    text-color:       @foreground;
+    font: "JetBrains Mono Bold 12";
+}
+
+window {
+    transparency: "real";
+    width: 600px;
+    background-color: @background;
+    border: 0px;                /* Borders removed */
+    border-radius: 12px;
+}
+
+mainbox {
+    padding: 20px;
+    children: [ inputbar, listview ];
+}
+
+inputbar {
+    background-color: transparent;
+    children: [ prompt, entry ];
+    margin: 0px 0px 15px 0px;
+}
+
+prompt {
+    background-color: transparent;
+    text-color: @foreground;
+    padding: 10px;
+    margin: 0px 10px 0px 0px;
+}
+
+entry {
+    background-color: @selected;
+    text-color: @foreground;
+    padding: 10px;
+    border-radius: 6px;
+    placeholder: "Search...";
+    placeholder-color: #FFFFFF66;
+}
+
+listview {
+    background-color: transparent;
+    columns: 1;
+    lines: 8;
+    scrollbar: false;
+    spacing: 5px;
+}
+
+element {
+    background-color: transparent;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+element selected {
+    background-color: @selected;
+    text-color: @foreground;
+    border: 0px;                /* Border removed from selection too */
+}
+
+element-text {
+    background-color: transparent;
+    text-color: inherit;
+    vertical-align: 0.5;
+}
+
+element-icon {
+    size: 24px;
+    margin: 0px 10px 0px 0px;
+    background-color: transparent;
+}

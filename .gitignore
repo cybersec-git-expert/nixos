@@ -1,8 +1,64 @@
 #
-# Keep this repo minimal: track only NixOS configuration under ./nixos
+# Keep this repo safe + intentional.
 #
+# Strategy:
+# - Ignore everything in ~/.config by default
+# - Allow-list only the folders you customize/script (Hyprland, terminal, music, etc.)
+# - Keep state/secret-y things (browsers, keyrings, caches) ignored
+#
+
+# Ignore everything by default
 *
+
+# Always keep these
 !.gitignore
 !README.md
+
+# NixOS configuration
 !nixos/
 !nixos/**
+
+# Window manager / lockscreen
+!hypr/
+!hypr/**
+!hyprlock/
+!hyprlock/**
+
+# Terminal + music stack
+!kitty/
+!kitty/**
+!mpd/
+!mpd/**
+!ncmpcpp/
+!ncmpcpp/**
+
+# Launcher / utilities
+!rofi/
+!rofi/**
+!udiskie/
+!udiskie/**
+
+# Audio / visualizers
+!easyeffects/
+!easyeffects/**
+!cava/
+!cava/**
+
+# Themes / toolkits (often customized)
+!gtk-3.0/
+!gtk-3.0/**
+!gtk-4.0/
+!gtk-4.0/**
+!qt5ct/
+!qt5ct/**
+!qt6ct/
+!qt6ct/**
+
+# Never commit secrets, caches, or local state
+**/.env
+**/*.env
+**/__pycache__/
+**/__pycache__/**
+**/*.pyc
+**/*.pyo
+**/*.log
