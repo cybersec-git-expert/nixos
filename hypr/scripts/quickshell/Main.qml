@@ -12,6 +12,22 @@ import "notifications" as Notifs
 PanelWindow {
     id: masterWindow
     color: "transparent"
+
+    // Pin overlay UI (Super+C stack, wallpaper picker, etc.) to the HP panel (Hyprland output).
+    readonly property string primaryHyprOutput: {
+        const e = Quickshell.env("QS_PRIMARY_OUTPUT");
+        return (e && String(e).trim() !== "") ? String(e).trim() : "DP-3";
+    }
+    screen: {
+        const screens = Quickshell.screens;
+        const want = masterWindow.primaryHyprOutput;
+        for (let i = 0; i < screens.length; i++) {
+            const s = screens[i];
+            if (s && s.name === want)
+                return s;
+        }
+        return screens.length ? screens[0] : undefined;
+    }
     
     IpcHandler {
         target: "main"
@@ -439,7 +455,6 @@ PanelWindow {
 
     onIsVisibleChanged: {
         if (isVisible) {
-            masterWindow.requestActivate();
             widgetContainer.forceActiveFocus();
         }
     }

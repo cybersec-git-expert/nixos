@@ -7,12 +7,24 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 
-Variants {
-    model: Quickshell.screens
+PanelWindow {
+    id: barWindow
 
-    delegate: Component {
-        PanelWindow {
-	    id: barWindow
+    // Single status bar on the HP (primary) panel only.
+    readonly property string primaryHyprOutput: {
+        const e = Quickshell.env("QS_PRIMARY_OUTPUT");
+        return (e && String(e).trim() !== "") ? String(e).trim() : "DP-3";
+    }
+    screen: {
+        const screens = Quickshell.screens;
+        const want = barWindow.primaryHyprOutput;
+        for (let i = 0; i < screens.length; i++) {
+            const s = screens[i];
+            if (s && s.name === want)
+                return s;
+        }
+        return screens.length ? screens[0] : undefined;
+    }
 
 	    property bool pendingReload: false
 
@@ -33,11 +45,6 @@ Variants {
                 }
 	    }
 
-            required property var modelData
-            
-            // Bind this specific bar instance to the dynamically assigned screen
-            screen: modelData
-            
             anchors {
                 bottom: true
                 left: true
@@ -895,6 +902,4 @@ Variants {
             }
 
             BackgroundEffect.blurRegion: Region { item: barLayer }
-        }
-    }
 }

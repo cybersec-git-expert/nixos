@@ -16,7 +16,18 @@ PanelWindow {
     
     exclusionMode: ExclusionMode.Ignore 
     focusable: true
-    screen: Quickshell.cursorScreen || Quickshell.screens[0]
+    // Match Main/TopBar primary output (override with QS_PRIMARY_OUTPUT).
+    screen: {
+        const wantEnv = Quickshell.env("QS_PRIMARY_OUTPUT");
+        const want = (wantEnv && String(wantEnv).trim() !== "") ? String(wantEnv).trim() : "DP-3";
+        const screens = Quickshell.screens;
+        for (let i = 0; i < screens.length; i++) {
+            const s = screens[i];
+            if (s && s.name === want)
+                return s;
+        }
+        return Quickshell.cursorScreen || (Quickshell.screens.length ? Quickshell.screens[0] : undefined);
+    }
     width: screen.width
     height: screen.height
 
