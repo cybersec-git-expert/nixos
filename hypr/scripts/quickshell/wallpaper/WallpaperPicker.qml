@@ -412,6 +412,12 @@ Item {
         return clean.startsWith("000_") ? clean.substring(4) : clean;
     }
 
+    function isVideoName(name) {
+        if (!name) return false;
+        let n = String(name);
+        return n.startsWith("000_") || /\.(mp4|mkv|mov|webm)$/i.test(n);
+    }
+
     function isDownloaded(name) {
         if (!name) return false;
         for (let i = 0; i < srcModel.count; i++) {
@@ -509,7 +515,7 @@ Item {
         let count = 0;
         for (let i = 0; i < targetModel.count; i++) {
             let fname = targetModel.get(i).fileName || "";
-            let isVid = fname.startsWith("000_");
+            let isVid = window.isVideoName(fname);
             if (checkItemMatchesFilter(fname, isVid, window.cacheVersion, window.currentFilter)) {
                 count++;
             }
@@ -771,7 +777,7 @@ Item {
         if (direction === 1) {
             for (let i = start + 1; i < targetModel.count; i++) {
                 let fname = targetModel.get(i).fileName || "";
-                let isVid = fname.startsWith("000_");
+                let isVid = window.isVideoName(fname);
                 if (checkItemMatchesFilter(fname, isVid, window.cacheVersion, window.currentFilter)) {
                     found = i; break;
                 }
@@ -779,7 +785,7 @@ Item {
         } else {
             for (let i = start - 1; i >= 0; i--) {
                 let fname = targetModel.get(i).fileName || "";
-                let isVid = fname.startsWith("000_");
+                let isVid = window.isVideoName(fname);
                 if (checkItemMatchesFilter(fname, isVid, window.cacheVersion, window.currentFilter)) {
                     found = i; break;
                 }
@@ -799,7 +805,7 @@ Item {
             for (let i = 0; i < targetModel.count; i++) {
                 current = (current + direction + targetModel.count) % targetModel.count;
                 let fname = targetModel.get(current).fileName || "";
-                let isVid = fname.startsWith("000_");
+                let isVid = window.isVideoName(fname);
                 
                 if (checkItemMatchesFilter(fname, isVid, window.cacheVersion, window.currentFilter)) {
                     view.currentIndex = current;
@@ -852,7 +858,7 @@ Item {
 
         for (let i = 0; i < targetModel.count; i++) {
             let fname = targetModel.get(i).fileName || "";
-            let isVid = fname.startsWith("000_");
+            let isVid = window.isVideoName(fname);
             
             if (checkItemMatchesFilter(fname, isVid, window.cacheVersion, window.currentFilter)) {
                 if (firstValidIndex === -1) {
@@ -934,7 +940,7 @@ Item {
             if (view.currentIndex >= 0 && view.currentIndex < targetModel.count) {
                 let fname = targetModel.get(view.currentIndex).fileName;
                 if (fname) {
-                    let isVid = String(fname).startsWith("000_");
+                    let isVid = window.isVideoName(fname);
                     window.applyWallpaper(String(fname), isVid);
                 }
             }
