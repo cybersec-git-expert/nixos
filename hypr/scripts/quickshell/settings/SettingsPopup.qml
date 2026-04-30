@@ -14,7 +14,8 @@ Item {
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
-        currentWidth: Screen.width
+        currentWidth: (root.width > 0 ? root.width
+            : (root.parent && root.parent.width > 0 ? root.parent.width : 1920))
     }
     
     function s(val) { 

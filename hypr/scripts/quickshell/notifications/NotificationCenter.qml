@@ -14,7 +14,8 @@ Item {
 
     Scaler {
         id: scaler
-        currentWidth: Screen.width
+        currentWidth: (window.width > 0 ? window.width
+            : (window.parent && window.parent.width > 0 ? window.parent.width : 1920))
     }
 
     function s(val) { return scaler.s(val); }

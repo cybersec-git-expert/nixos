@@ -19,7 +19,8 @@ Item {
 
     // ── Scaling (self-contained; avoids Scaler import issues) ─────────────────
     readonly property real _scale: {
-        const mw = Screen.width > 0 ? Screen.width : 1920;
+        const mw = (root.width > 0 ? root.width
+            : (root.parent && root.parent.width > 0 ? root.parent.width : 1920));
         const r = mw / 1920.0;
         const base = (r <= 1.0) ? Math.max(0.35, Math.pow(r, 0.85)) : Math.pow(r, 0.5);
         return base;

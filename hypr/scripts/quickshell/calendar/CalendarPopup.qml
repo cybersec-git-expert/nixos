@@ -15,7 +15,8 @@ Item {
     Scaler {
         id: scaler
         // Uses the physical screen width so the popup scales synchronously
-        currentWidth: Screen.width
+        currentWidth: (window.width > 0 ? window.width
+            : (window.parent && window.parent.width > 0 ? window.parent.width : 1920))
     }
     
     // Helper function scoped to the root Item for easy access

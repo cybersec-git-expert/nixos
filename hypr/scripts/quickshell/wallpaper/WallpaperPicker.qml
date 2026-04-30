@@ -10,14 +10,15 @@ import "../"
 
 Item {
     id: window
-    width: Screen.width
+    anchors.fill: parent
 
     // (debug overlay removed)
 
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
-        currentWidth: Screen.width
+        currentWidth: (window.width > 0 ? window.width
+            : (window.parent && window.parent.width > 0 ? window.parent.width : 1920))
     }
     
     function s(val) { 

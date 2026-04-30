@@ -51,8 +51,10 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore 
     focusable: true
 
-    width: Screen.width
-    height: Screen.height
+    // Match the Wayland output we pin to (`screen:`). Global `Screen.*` can still reflect
+    // another display, which breaks WindowRegistry alignment vs the real layer size.
+    width: (masterWindow.screen && masterWindow.screen.width > 0) ? masterWindow.screen.width : Screen.width
+    height: (masterWindow.screen && masterWindow.screen.height > 0) ? masterWindow.screen.height : Screen.height
 
     visible: isVisible
 
@@ -387,7 +389,9 @@ PanelWindow {
     }
 
     function getLayout(name) {
-        return Registry.getLayout(name, 0, 0, Screen.width, Screen.height, masterWindow.globalUiScale);
+        const w = masterWindow.width > 0 ? masterWindow.width : Screen.width;
+        const h = masterWindow.height > 0 ? masterWindow.height : Screen.height;
+        return Registry.getLayout(name, 0, 0, w, h, masterWindow.globalUiScale);
     }
 
     function processWidgetIpc(rawCmd) {
@@ -434,7 +438,7 @@ PanelWindow {
     }
 
     Connections {
-        target: Screen
+        target: masterWindow
         function onWidthChanged() { handleNativeScreenChange(); }
         function onHeightChanged() { handleNativeScreenChange(); }
     }

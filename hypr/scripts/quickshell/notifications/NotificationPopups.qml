@@ -31,8 +31,10 @@ PanelWindow {
     property var popupModel
     property real uiScale: 1.0
 
-    // Fetch the registry properties dynamically based on the current screen width and uiScale
-    property var layoutConfig: Registry.getPopupLayout(Screen.width, popupWindow.uiScale)
+    // Fetch the registry properties dynamically based on the output this surface is pinned to.
+    property var layoutConfig: Registry.getPopupLayout(
+        (popupWindow.screen && popupWindow.screen.width > 0) ? popupWindow.screen.width : Screen.width,
+        popupWindow.uiScale)
 
     WlrLayershell.namespace: "qs-popups"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -55,7 +57,9 @@ PanelWindow {
     readonly property color frostTint: Qt.rgba(0.10, 0.10, 0.12, 0.52)
 
     width: popupWindow.layoutConfig.w
-    height: Math.min(popupList.contentHeight, Screen.height * 0.8)
+    height: Math.min(
+        popupList.contentHeight,
+        ((popupWindow.screen && popupWindow.screen.height > 0) ? popupWindow.screen.height : Screen.height) * 0.8)
 
     // Smoothly adjust window height so it doesn't instantly snap when popups are added/removed
     Behavior on height {
