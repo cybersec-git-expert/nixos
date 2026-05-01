@@ -2,7 +2,10 @@
 # Shared power actions for Rofi menu, hyprlock (Quickshell Lock.qml), keybinds, etc.
 # Ensures /run/current-system/sw/bin is on PATH (NixOS) so systemctl is found from minimal environments.
 set -euo pipefail
-PATH="${PATH}:/run/current-system/sw/bin:/usr/bin:/bin"
+# NixOS: use full paths; sudo uses your NOPASSWD rules (polkit does not apply to sudo).
+PATH="${PATH}:/run/current-system/sw/bin:/run/wrappers/bin:/usr/bin:/bin"
+SYSTEMCTL="/run/current-system/sw/bin/systemctl"
+SUDO="/run/wrappers/bin/sudo"
 
 # UPS safety — block suspend/hibernate when on battery and charge ≤ 50% (same policy as rofi-power-menu.sh)
 ups_safe_to_suspend() {
@@ -27,18 +30,19 @@ ups_safe_to_suspend() {
 cmd="${1:-}"
 case "$cmd" in
     suspend|sleep)
-        ups_safe_to_suspend || exec systemctl poweroff
-        exec systemctl suspend
+        ups_safe_to_suspend || exec "$SUDO" -n "$SYSTEMCTL" poweroff
+        exec "$SUDO" -n "$SYSTEMCTL" suspend
         ;;
     hibernate)
-        ups_safe_to_suspend || exec systemctl poweroff
-        exec systemctl hibernate
+        ups_safe_to_suspend || exec "$SUDO" -n "$SYSTEMCTL" poweroff
+        exec "$SUDO" -n "$SYSTEMCTL" hibernate
         ;;
     reboot|restart)
-        exec systemctl reboot
+        # logind usually allows reboot without sudo; no NOPASSWD rule for it here.
+        exec "$SYSTEMCTL" reboot
         ;;
     poweroff|shutdown)
-        exec systemctl poweroff
+        exec "$SYSTEMCTL" poweroff
         ;;
     *)
         echo "Usage: $0 suspend | hibernate | reboot | poweroff" >&2

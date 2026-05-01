@@ -54,8 +54,8 @@ execute_action() {
         hibernate)
             confirm_action "Hibernate the system?" || { notify_action "Hibernate cancelled" "low"; return; }
             notify_action "Hibernating..." "normal"
-            execute_action lock
-            sleep 1
+            # Do not lock before hibernate: hyprlock blocks the Polkit prompt for `systemctl
+            # hibernate`, and we use `sudo -n systemctl …` in power-action.sh (NOPASSWD) anyway.
             if ! "$POWER_ACTION" hibernate; then
                 notify_action "Hibernate failed — check swap, resume= kernel param, and boot.resumeDevice" "critical"
                 return
