@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 let
   unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
 in
@@ -50,6 +50,13 @@ in
     powerManagement.finegrained = false;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
+
+  # NVIDIA's `nvidia-sleep.sh hibernate` often runs before the kernel snapshot but never
+  # lets hibernation finish: journal stops at "Performing sleep operation 'hibernate'..."
+  # and the next boot shows `PM: Image not found` (no swap image). Suspend still uses
+  # nvidia-suspend.service; we only skip the hibernate-specific hook so the kernel can
+  # write the image. If resume-from-hibernate has GPU glitches, remove this override.
+  systemd.services.nvidia-hibernate.serviceConfig.ExecStart = lib.mkForce "${pkgs.coreutils}/bin/true";
 
   # Input
   services.libinput.enable = true;
@@ -120,7 +127,6 @@ in
     # Use platform (ACPI S4) only; "shutdown" as a fallback writes a different /sys/power/disk
     # path and can end up powering off like a cold boot instead of resuming from swap.
     HibernateMode=platform
-    HybridSleepMode=suspend platform shutdown
   '';
 
   # greetd — text login screen, launches Hyprland directly (no compositor conflict)
