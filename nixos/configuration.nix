@@ -1,6 +1,34 @@
 { config, pkgs, ... }:
 let
   unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
+
+  # systemd-sleep runs as root: hyprctl / systemctl --user need the *graphical user's*
+  # runtime dir + D-Bus + Hyprland instance id, or they no-op and resume looks "frozen".
+  hyprResumeInner = pkgs.writeText "hypr-resume-inner.sh" ''
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=''${XDG_RUNTIME_DIR}/bus"
+    if [[ -d "''${XDG_RUNTIME_DIR}/hypr" ]]; then
+      for d in "''${XDG_RUNTIME_DIR}"/hypr/*; do
+        [[ -d "$d" ]] || continue
+        export HYPRLAND_INSTANCE_SIGNATURE="$(basename "$d")"
+        break
+      done
+    fi
+    export WAYLAND_DISPLAY="''${WAYLAND_DISPLAY:-wayland-1}"
+
+    /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
+    /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal-hyprland.service >/dev/null 2>&1 || true
+    /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal.service >/dev/null 2>&1 || true
+  '';
+
+  hyprResumeRecover = pkgs.writeShellScript "99-hypr-resume-recover.sh" ''
+    set -euo pipefail
+    case "''${1:-}" in post) ;; *) exit 0 ;; esac
+    sleep 1
+    runuser -u cyberexpert -- ${pkgs.bash}/bin/bash ${hyprResumeInner}
+  '';
 in
 {
   imports = [ ./hardware-configuration.nix
@@ -56,26 +84,11 @@ in
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
-  # After long hibernation resumes, the NVIDIA DRM stack sometimes comes back in a bad
-  # modeset state (flip timeouts / atomic commit errors), which can look like a full UI freeze.
-  # Run a small post-resume recovery in the user session.
+  # After suspend/hibernate, NVIDIA DRM sometimes resumes with broken modesets; Hyprland
+  # then looks frozen (no pointer / can't type into a locker). Run recovery as the seat user.
   environment.etc."systemd/system-sleep/99-hypr-resume-recover.sh" = {
+    source = hyprResumeRecover;
     mode = "0755";
-    text = ''
-      #!/usr/bin/env bash
-      set -euo pipefail
-      # NOTE: escape bash parameter expansion so Nix doesn't try to interpolate it.
-      [[ "''${1:-}" == "post" ]] || exit 0
-
-      u="cyberexpert"
-      # Give the compositor / GPU stack a moment.
-      sleep 1
-
-      # Ensure outputs are re-enabled and portals are healthy.
-      runuser -u "$u" -- /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
-      runuser -u "$u" -- /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal-hyprland.service >/dev/null 2>&1 || true
-      runuser -u "$u" -- /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal.service >/dev/null 2>&1 || true
-    '';
   };
 
   # Input
