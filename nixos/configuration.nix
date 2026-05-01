@@ -64,7 +64,8 @@ in
     text = ''
       #!/usr/bin/env bash
       set -euo pipefail
-      [[ "${1:-}" == "post" ]] || exit 0
+      # NOTE: escape bash ${...} so Nix doesn't try to interpolate it.
+      [[ "''${1:-}" == "post" ]] || exit 0
 
       u="cyberexpert"
       # Give the compositor / GPU stack a moment.
