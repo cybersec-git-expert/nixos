@@ -52,7 +52,7 @@ in
     # pci_pm_freeze on the GPU returns -5 and hibernate aborts (screen freezes, then
     # nothing). Resume-from-hibernate can still fail on some setups; then prefer sleep.
     powerManagement.enable = true;
-    powerManagement.finegrained = true;
+    powerManagement.finegrained = false;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
@@ -64,7 +64,7 @@ in
     text = ''
       #!/usr/bin/env bash
       set -euo pipefail
-      # NOTE: escape bash ${...} so Nix doesn't try to interpolate it.
+      # NOTE: escape bash parameter expansion so Nix doesn't try to interpolate it.
       [[ "''${1:-}" == "post" ]] || exit 0
 
       u="cyberexpert"
