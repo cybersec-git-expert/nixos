@@ -1,7 +1,6 @@
 { config, pkgs, ... }:
 let
   unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
-  tamilMp3Downloader = pkgs.callPackage ./tamil-mp3-downloader.nix { };
 in
 {
   imports = [ ./hardware-configuration.nix
@@ -238,7 +237,6 @@ in
     xfsprogs
     # CLI essentials
     htop btop fastfetch curl wget git unzip zip ripgrep fd bat eza awscli2
-    tamilMp3Downloader
     # Audio control
     pavucontrol
     # Editors
