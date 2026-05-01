@@ -117,7 +117,9 @@ in
 
   # Enable hibernate and hybrid-sleep targets
   systemd.sleep.extraConfig = ''
-    HibernateMode=platform shutdown
+    # Use platform (ACPI S4) only; "shutdown" as a fallback writes a different /sys/power/disk
+    # path and can end up powering off like a cold boot instead of resuming from swap.
+    HibernateMode=platform
     HybridSleepMode=suspend platform shutdown
   '';
 
@@ -261,10 +263,9 @@ in
     extraPortals = [ pkgs.xdg-desktop-portal-hyprland ];
   };
 
-  # Swap (ext4 install — no btrfs)
-  swapDevices = [ { device = "/dev/disk/by-uuid/ccca1d4a-bbf0-41e1-b330-0e74d0858318"; } ];
+  # Swap + resume: partition is already in hardware-configuration.nix (do not duplicate
+  # swapDevices — two identical entries can break hibernate / swapon at boot).
   boot.resumeDevice = "/dev/disk/by-uuid/ccca1d4a-bbf0-41e1-b330-0e74d0858318";
-  
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
