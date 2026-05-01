@@ -39,10 +39,14 @@ in
     modesetting.enable = true;
     open = false;
     nvidiaSettings = true;
-    # NOTE: Hibernate resume currently fails with NVIDIA returning -5 during freeze
-    # when PreserveVideoMemoryAllocations is enabled. Disable NVIDIA power management
-    # to avoid enabling that path so hibernate can resume reliably.
-    powerManagement.enable = false;
+    # VRAM save/restore + nvidia-suspend/nvidia-resume (systemd). Needed for many
+    # proprietary-driver setups so monitors come back after S3 (deep) sleep.
+    #
+    # Tradeoff: this enables NVreg_PreserveVideoMemoryAllocations — **hibernate**
+    # can fail again with NVIDIA -5 during resume on some setups. If you rely on
+    # hibernate, set this back to false and use `mem_sleep_default=s2idle` in
+    # boot.kernelParams instead (monitors OK, cooler may stay on in sleep).
+    powerManagement.enable = true;
     powerManagement.finegrained = false;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
