@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, ... }:
 let
   unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
 in
@@ -42,21 +42,14 @@ in
     # VRAM save/restore + nvidia-suspend/nvidia-resume (systemd). Needed for many
     # proprietary-driver setups so monitors come back after S3 (deep) sleep.
     #
-    # Tradeoff: this enables NVreg_PreserveVideoMemoryAllocations — **hibernate**
-    # can fail again with NVIDIA -5 during resume on some setups. If you rely on
-    # hibernate, set this back to false and use `mem_sleep_default=s2idle` in
-    # boot.kernelParams instead (monitors OK, cooler may stay on in sleep).
+    # PreserveVideoMemoryAllocations + nvidia-suspend/hibernate/resume services.
+    # Hibernate needs nvidia-hibernate.service (nvidia-sleep.sh hibernate): without it,
+    # pci_pm_freeze on the GPU returns -5 and hibernate aborts (screen freezes, then
+    # nothing). Resume-from-hibernate can still fail on some setups; then prefer sleep.
     powerManagement.enable = true;
     powerManagement.finegrained = false;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
-
-  # NVIDIA's `nvidia-sleep.sh hibernate` often runs before the kernel snapshot but never
-  # lets hibernation finish: journal stops at "Performing sleep operation 'hibernate'..."
-  # and the next boot shows `PM: Image not found` (no swap image). Suspend still uses
-  # nvidia-suspend.service; we only skip the hibernate-specific hook so the kernel can
-  # write the image. If resume-from-hibernate has GPU glitches, remove this override.
-  systemd.services.nvidia-hibernate.serviceConfig.ExecStart = lib.mkForce "${pkgs.coreutils}/bin/true";
 
   # Input
   services.libinput.enable = true;
