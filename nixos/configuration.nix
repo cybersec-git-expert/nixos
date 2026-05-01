@@ -52,8 +52,29 @@ in
     # pci_pm_freeze on the GPU returns -5 and hibernate aborts (screen freezes, then
     # nothing). Resume-from-hibernate can still fail on some setups; then prefer sleep.
     powerManagement.enable = true;
-    powerManagement.finegrained = false;
+    powerManagement.finegrained = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
+  };
+
+  # After long hibernation resumes, the NVIDIA DRM stack sometimes comes back in a bad
+  # modeset state (flip timeouts / atomic commit errors), which can look like a full UI freeze.
+  # Run a small post-resume recovery in the user session.
+  environment.etc."systemd/system-sleep/99-hypr-resume-recover.sh" = {
+    mode = "0755";
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      [[ "${1:-}" == "post" ]] || exit 0
+
+      u="cyberexpert"
+      # Give the compositor / GPU stack a moment.
+      sleep 1
+
+      # Ensure outputs are re-enabled and portals are healthy.
+      runuser -u "$u" -- /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
+      runuser -u "$u" -- /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal-hyprland.service >/dev/null 2>&1 || true
+      runuser -u "$u" -- /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal.service >/dev/null 2>&1 || true
+    '';
   };
 
   # Input
