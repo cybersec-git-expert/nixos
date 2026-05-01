@@ -18,7 +18,15 @@ let
     fi
     export WAYLAND_DISPLAY="''${WAYLAND_DISPLAY:-wayland-1}"
 
+    # Long S3 / hibernate: DRM stack sometimes needs a hard DPMS cycle, not only "on".
     /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
+    sleep 0.4
+    /run/current-system/sw/bin/hyprctl dispatch dpms off >/dev/null 2>&1 || true
+    sleep 0.6
+    /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
+    sleep 0.3
+    /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
+
     /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal-hyprland.service >/dev/null 2>&1 || true
     /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal.service >/dev/null 2>&1 || true
   '';
@@ -26,7 +34,8 @@ let
   hyprResumeRecover = pkgs.writeShellScript "99-hypr-resume-recover.sh" ''
     set -euo pipefail
     case "''${1:-}" in post) ;; *) exit 0 ;; esac
-    sleep 1
+    # After many hours in sleep, USB + GPU can take noticeably longer to come back.
+    sleep 3
     runuser -u cyberexpert -- ${pkgs.bash}/bin/bash ${hyprResumeInner}
   '';
 in
@@ -55,6 +64,12 @@ in
     "nvidia-drm.modeset=1"
     "nvidia-drm.fbdev=1"
     "resume=UUID=ccca1d4a-bbf0-41e1-b330-0e74d0858318"
+    # Long suspend: hubs / wireless dongles / some keyboards stop responding after deep S3
+    # unless USB autosuspend is disabled (looks like a full freeze if pointer won't move).
+    "usbcore.autosuspend=-1"
+    # Long suspend + discrete NVIDIA: link power management can leave the GPU in a bad state
+    # on resume (flip timeouts / dead compositor). Trades a bit of idle power for stability.
+    "pcie_aspm=off"
     # Do NOT force mem_sleep_default=s2idle here: s2idle keeps most of the platform powered,
     # so AIO/pump/fan headers often stay alive and fans keep spinning. True S3 ("deep") is
     # what actually powered your cooler off before. If NVIDIA resume breaks again (TTY /
