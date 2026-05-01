@@ -236,7 +236,7 @@ in
     # Filesystem tools
     xfsprogs
     # CLI essentials
-    htop btop fastfetch curl wget git unzip zip ripgrep fd bat eza
+    htop btop fastfetch curl wget git unzip zip ripgrep fd bat eza awscli2
     # Audio control
     pavucontrol
     # Editors
