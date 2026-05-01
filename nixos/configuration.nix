@@ -17,6 +17,7 @@ let
       done
     fi
     export WAYLAND_DISPLAY="''${WAYLAND_DISPLAY:-wayland-1}"
+    export PATH="/run/current-system/sw/bin''${PATH:+:$PATH}"
 
     # Long S3 / hibernate: DRM stack sometimes needs a hard DPMS cycle, not only "on".
     /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
@@ -29,6 +30,13 @@ let
 
     /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal-hyprland.service >/dev/null 2>&1 || true
     /run/current-system/sw/bin/systemctl --user restart xdg-desktop-portal.service >/dev/null 2>&1 || true
+
+    # swww / mpvpaper lose the Wayland surface after sleep; wallpaper stays black until reboot
+    # unless we re-apply from ~/.config/wallpaper-manager/current_wallpaper.txt.
+    if [[ -x "$HOME/.config/hypr/scripts/wallpaper-manager.sh" ]]; then
+      sleep 0.5
+      "$HOME/.config/hypr/scripts/wallpaper-manager.sh" init >/dev/null 2>&1 || true
+    fi
   '';
 
   hyprResumeRecover = pkgs.writeShellScript "99-hypr-resume-recover.sh" ''
