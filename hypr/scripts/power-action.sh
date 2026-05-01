@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Shared power actions for Rofi menu, hyprlock (Quickshell Lock.qml), keybinds, etc.
-# Ensures /run/current-system/sw/bin is on PATH (NixOS) so systemctl is found from minimal environments.
+# Uses systemctl as your user (logind + Polkit). NixOS: allow wheel in security.polkit.extraConfig
+# so suspend/hibernate are not blocked. Do not use `sudo systemctl hibernate` with Hyprland —
+# it runs as root and often freezes then aborts without completing hibernate.
 set -euo pipefail
-# NixOS: use full paths; sudo uses your NOPASSWD rules (polkit does not apply to sudo).
-PATH="${PATH}:/run/current-system/sw/bin:/run/wrappers/bin:/usr/bin:/bin"
+PATH="${PATH}:/run/current-system/sw/bin:/usr/bin:/bin"
 SYSTEMCTL="/run/current-system/sw/bin/systemctl"
-SUDO="/run/wrappers/bin/sudo"
 
-# UPS safety — block suspend/hibernate when on battery and charge ≤ 50% (same policy as rofi-power-menu.sh)
+# UPS safety — block suspend/hibernate when on battery and charge ≤ 50%
 ups_safe_to_suspend() {
     command -v upsc &>/dev/null || return 0
     local ups_name
@@ -30,15 +30,14 @@ ups_safe_to_suspend() {
 cmd="${1:-}"
 case "$cmd" in
     suspend|sleep)
-        ups_safe_to_suspend || exec "$SUDO" -n "$SYSTEMCTL" poweroff
-        exec "$SUDO" -n "$SYSTEMCTL" suspend
+        ups_safe_to_suspend || exec "$SYSTEMCTL" poweroff
+        exec "$SYSTEMCTL" suspend
         ;;
     hibernate)
-        ups_safe_to_suspend || exec "$SUDO" -n "$SYSTEMCTL" poweroff
-        exec "$SUDO" -n "$SYSTEMCTL" hibernate
+        ups_safe_to_suspend || exec "$SYSTEMCTL" poweroff
+        exec "$SYSTEMCTL" hibernate
         ;;
     reboot|restart)
-        # logind usually allows reboot without sudo; no NOPASSWD rule for it here.
         exec "$SYSTEMCTL" reboot
         ;;
     poweroff|shutdown)

@@ -110,6 +110,24 @@ in
   # Security
   security.sudo.wheelNeedsPassword = true;
   security.polkit.enable = true;
+  # loginctl / systemctl suspend+hibernate from the graphical session must be allowed without
+  # an interactive prompt; `sudo systemctl hibernate` runs as root and often freezes then
+  # aborts because it is not tied to your seat/session the same way.
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (!subject.local || !subject.isInGroup("wheel")) return;
+      if (action.id == "org.freedesktop.login1.hibernate" ||
+          action.id == "org.freedesktop.login1.hibernate-multiple-sessions" ||
+          action.id == "org.freedesktop.login1.suspend" ||
+          action.id == "org.freedesktop.login1.suspend-multiple-sessions" ||
+          action.id == "org.freedesktop.login1.power-off" ||
+          action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+          action.id == "org.freedesktop.login1.reboot" ||
+          action.id == "org.freedesktop.login1.reboot-multiple-sessions") {
+        return polkit.Result.YES;
+      }
+    });
+  '';
   security.rtkit.enable = true;
 
   # Hibernate / hybrid-sleep — allow wheel users without extra password prompt
