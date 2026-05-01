@@ -22,11 +22,10 @@ in
     "nvidia-drm.modeset=1"
     "nvidia-drm.fbdev=1"
     "resume=UUID=ccca1d4a-bbf0-41e1-b330-0e74d0858318"
-    # Default "deep" (S3) suspend often triggers nvidia-drm atomic commit failures on wake
-    # (Hyprland dies → you see a TTY like "nixos login:" instead of hyprlock). s2idle is
-    # shallower (still saves most power on desktop) but usually survives resume with the
-    # proprietary NVIDIA stack. Remove this line if you need true S3 and accept the risk.
-    "mem_sleep_default=s2idle"
+    # Do NOT force mem_sleep_default=s2idle here: s2idle keeps most of the platform powered,
+    # so AIO/pump/fan headers often stay alive and fans keep spinning. True S3 ("deep") is
+    # what actually powered your cooler off before. If NVIDIA resume breaks again (TTY /
+    # nv_drm_atomic_commit errors), add back: "mem_sleep_default=s2idle" as a tradeoff.
   ];
   boot.initrd.kernelModules = [ "nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm" ];
   boot.kernelModules = [ "usbhid" "hid_generic" "evdev" "xhci_hcd" ];
