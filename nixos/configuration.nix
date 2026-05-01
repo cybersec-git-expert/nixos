@@ -10,8 +10,9 @@ in
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.allowBroken = true;
 
-  # Bootloader
+  # Bootloader — only keep the newest N generations in the boot menu (and on /boot).
   boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.configurationLimit = 4;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
   boot.kernelPackages = pkgs.linuxPackages_6_6;  
