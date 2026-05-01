@@ -7,6 +7,7 @@ from pathlib import Path
 QS = Path.home() / ".config/hypr/scripts/quickshell/qs_colors.json"
 OUT = Path.home() / ".config/hypr/hyprlock.matugen.conf"
 LOCK_BG = Path.home() / ".config/wallpaper-manager/lockscreen_blurred.jpg"
+LOCK_BG_CACHED = Path.home() / ".config/wallpaper-manager/lock_background.png"
 
 
 def hx(data: dict, key: str, default: str = "#ffffff") -> str:
@@ -31,7 +32,12 @@ def main() -> int:
     err = hx(data, "red", "#f38ba8")
     warn = hx(data, "yellow", "#f9e2af")
 
-    lock_path = LOCK_BG if LOCK_BG.is_file() else Path("/tmp/lock_bg.png")
+    if LOCK_BG.is_file():
+        lock_path = LOCK_BG
+    elif LOCK_BG_CACHED.is_file():
+        lock_path = LOCK_BG_CACHED
+    else:
+        lock_path = Path("/tmp/lock_bg.png")
 
     out = f"""# Generated from qs_colors.json — do not edit by hand
 

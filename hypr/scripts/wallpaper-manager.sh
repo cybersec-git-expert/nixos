@@ -7,6 +7,35 @@ cmd="${1:-}"
 WALL_DIR="${HOME}/.config/wallpaper-manager"
 WALL_FILE_TXT="${WALL_DIR}/current_wallpaper.txt"
 WALL_OUTPUTS_TXT="${WALL_DIR}/current_wallpaper_outputs.txt"
+# Persists across reboot (/tmp is cleared). Quickshell Lock + hyprlock use this.
+LOCK_BG_PERSIST="${WALL_DIR}/lock_background.png"
+THUMB_CACHE="${HOME}/.cache/wallpaper_picker/thumbs"
+
+sync_lock_background() {
+  local wp="$1"
+  [[ -n "$wp" ]] || return 0
+  [[ -f "$wp" ]] || return 0
+  mkdir -p "$WALL_DIR"
+  local ext="${wp##*.}"
+  ext="${ext,,}"
+  if [[ "$ext" =~ ^(mp4|mkv|mov|webm)$ ]]; then
+    local base="${wp##*/}"
+    if [[ -f "${THUMB_CACHE}/${base}" ]]; then
+      cp -f -- "${THUMB_CACHE}/${base}" "$LOCK_BG_PERSIST" 2>/dev/null || true
+    elif command -v ffmpeg >/dev/null 2>&1; then
+      ffmpeg -hide_banner -loglevel error -y -i "$wp" -vf "scale=1920:-2" -vframes 1 "$LOCK_BG_PERSIST" 2>/dev/null || true
+    fi
+  else
+    if command -v magick >/dev/null 2>&1; then
+      magick "$wp" -strip -resize '3840x3840>' "$LOCK_BG_PERSIST" 2>/dev/null || cp -f -- "$wp" "$LOCK_BG_PERSIST" 2>/dev/null || true
+    else
+      cp -f -- "$wp" "$LOCK_BG_PERSIST" 2>/dev/null || true
+    fi
+  fi
+  if [[ -f "$LOCK_BG_PERSIST" ]]; then
+    cp -f -- "$LOCK_BG_PERSIST" /tmp/lock_bg.png 2>/dev/null || true
+  fi
+}
 
 ensure_swww() {
   if ! command -v swww >/dev/null 2>&1; then
@@ -47,22 +76,32 @@ apply_wallpaper() {
       mpvpaper -o 'loop --no-audio --hwdec=auto --profile=high-quality --video-sync=display-resample --interpolation --tscale=oversample' "$outputs" "$wp" >/dev/null 2>&1 &
       disown 2>/dev/null || true
     fi
+    sync_lock_background "$wp"
     return 0
   fi
 
   ensure_swww
   if command -v swww >/dev/null 2>&1; then
-    # Try Vulkan backend first, then default backend.
-    if [[ "$outputs" == "*" ]]; then
-      env WGPU_BACKEND=vulkan swww img "$wp" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
-        || swww img "$wp" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
-        || true
-    else
-      env WGPU_BACKEND=vulkan swww img "$wp" --outputs "$outputs" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
-        || swww img "$wp" --outputs "$outputs" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
-        || true
-    fi
+    # Hyprland outputs are not always ready immediately after login; retry a few times.
+    local ok=0 attempt
+    for attempt in 1 2 3 4 5 6 7 8; do
+      if [[ "$outputs" == "*" ]]; then
+        if env WGPU_BACKEND=vulkan swww img "$wp" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
+          || swww img "$wp" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+          ok=1
+          break
+        fi
+      else
+        if env WGPU_BACKEND=vulkan swww img "$wp" --outputs "$outputs" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1 \
+          || swww img "$wp" --outputs "$outputs" --resize crop --transition-type any --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+          ok=1
+          break
+        fi
+      fi
+      sleep 1
+    done
   fi
+  sync_lock_background "$wp"
 }
 
 case "$cmd" in

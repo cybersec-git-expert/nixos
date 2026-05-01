@@ -108,7 +108,9 @@ ShellRoot {
                 readonly property real sc: scaler.baseScale
                 // --------------------------------
 
-                property string staticWallpaperPath: "file:///tmp/lock_bg.png"
+                // Persisted by wallpaper-manager / picker ( /tmp is empty after reboot ).
+                readonly property string lockBgPersist: "file://" + Quickshell.env("HOME") + "/.config/wallpaper-manager/lock_background.png"
+                property string staticWallpaperPath: lockBgPersist
 
                 property string batPct: "100"
                 property string batStatus: "AC"

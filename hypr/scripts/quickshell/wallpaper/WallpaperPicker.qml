@@ -166,6 +166,8 @@ Item {
                         export RELOAD_SCRIPT="${escapeBash(reloadScript)}"
                         export OUTPUTS_VALUE="${escapeBash(outputsValue)}"
                         
+                        mkdir -p "$HOME/.config/wallpaper-manager"
+                        cp "$DEST_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" || true
                         cp "$DEST_FILE" /tmp/lock_bg.png || true
                         pkill mpvpaper || true
                         
@@ -230,6 +232,8 @@ Item {
                             
                             echo 'close' > /tmp/qs_widget_state
                             
+                            mkdir -p "$HOME/.config/wallpaper-manager"
+                            cp "$DEST_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" || true
                             cp "$DEST_FILE" /tmp/lock_bg.png || true
                             pkill mpvpaper || true
                             
@@ -278,7 +282,7 @@ Item {
 
         if (isVideo) {
             wallpaperCmd = `mpvpaper -o 'loop --no-audio --hwdec=auto --profile=high-quality --video-sync=display-resample --interpolation --tscale=oversample' "\${OUTPUTS_VALUE:-*}" "$WALL_FILE"`
-            lockBgCmd = `cp "$THUMB_FILE" /tmp/lock_bg.png`
+            lockBgCmd = `mkdir -p "$HOME/.config/wallpaper-manager" && cp "$THUMB_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" && cp "$THUMB_FILE" /tmp/lock_bg.png`
         } else {
             wallpaperCmd = `
                 ${ensureDaemonCmd}
@@ -296,7 +300,7 @@ Item {
                     sleep 0.05
                 done
             `
-            lockBgCmd = `cp "$WALL_FILE" /tmp/lock_bg.png`
+            lockBgCmd = `mkdir -p "$HOME/.config/wallpaper-manager" && cp "$WALL_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" && cp "$WALL_FILE" /tmp/lock_bg.png`
         }
 
         const fullScript = `
