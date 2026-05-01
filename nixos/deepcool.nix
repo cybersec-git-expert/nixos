@@ -1,6 +1,20 @@
 { config, pkgs, lib, ... }:
 
 let
+  # Stop LCD/USB polling during suspend so the AIO can idle (s2idle keeps USB power;
+  # a running deepcool-cli session can keep the device from powering down like S3 would).
+  deepcoolSleepHook = pkgs.writeShellScript "50-deepcool-sleep" ''
+    set -euo pipefail
+    case "''${1:-}" in
+      pre)
+        /run/current-system/sw/bin/systemctl stop deepcool-cli.service 2>/dev/null || true
+        ;;
+      post)
+        /run/current-system/sw/bin/systemctl start deepcool-cli.service 2>/dev/null || true
+        ;;
+    esac
+  '';
+
   deepcool-cli = pkgs.stdenv.mkDerivation {
     pname = "deepcool-cli";
     version = "1.0.0";
@@ -31,6 +45,11 @@ in
 
   # plugdev group for udev rules
   users.groups.plugdev = {};
+
+  environment.etc."systemd/system-sleep/50-deepcool.sh" = {
+    source = deepcoolSleepHook;
+    mode = "0755";
+  };
 
   # udev rules — non-root HID/USB access for all DeepCool devices
   services.udev.extraRules = ''
@@ -66,28 +85,6 @@ in
       StandardOutput = "journal";
       StandardError = "journal";
       SyslogIdentifier = "deepcool-cli";
-    };
-  };
-
-  # Restart after suspend/hibernate
-  systemd.services.deepcool-resume = {
-    description = "Restart DeepCool controller after system resume";
-    after = [
-      "suspend.target"
-      "hibernate.target"
-      "hybrid-sleep.target"
-      "suspend-then-hibernate.target"
-    ];
-    wantedBy = [
-      "suspend.target"
-      "hibernate.target"
-      "hybrid-sleep.target"
-      "suspend-then-hibernate.target"
-    ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
-      ExecStart = "${pkgs.systemd}/bin/systemctl restart deepcool-cli.service";
     };
   };
 }
