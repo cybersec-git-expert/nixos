@@ -5,6 +5,7 @@ let
     beautifulsoup4
     requests
     clint
+    colorama
   ]);
   rev = "123c69e150e246c2b253792ca9ec66e4bab144b5";
   src = fetchFromGitHub {
