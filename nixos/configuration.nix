@@ -16,7 +16,11 @@ in
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
   boot.kernelPackages = pkgs.linuxPackages_6_6;  
 
-  # Nvidia — load modules in initrd so they're ready before Hyprland
+  # Nvidia: keep modeset/fbdev on the real kernel; do **not** load NVIDIA in initrd.
+  # Loading nvidia_drm in stage-1 before `resume=` runs can leave the GPU half-initialized so
+  # hibernate **resume** fails after the image is fully loaded (`pci_pm_freeze … -5`, then
+  # "Failed to load image, recovering" → looks like a fresh boot). Hyprland still gets the
+  # driver after switch-root. If your LUKS prompt needs a framebuffer, you still have EFI fb.
   # Also set resume= so hibernate/hybrid-sleep can restore from swap.
   boot.kernelParams = [
     "nvidia-drm.modeset=1"
@@ -27,7 +31,7 @@ in
     # what actually powered your cooler off before. If NVIDIA resume breaks again (TTY /
     # nv_drm_atomic_commit errors), add back: "mem_sleep_default=s2idle" as a tradeoff.
   ];
-  boot.initrd.kernelModules = [ "nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm" ];
+  boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "usbhid" "hid_generic" "evdev" "xhci_hcd" ];
   boot.extraModulePackages = [ config.boot.kernelPackages.r8125 ];
 
