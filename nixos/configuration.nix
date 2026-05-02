@@ -344,7 +344,7 @@ in
     <?xml version='1.0'?>
     <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
     <fontconfig>
-      <dir>/Vault/Fonts</dir>
+      <dir>/Vault/Brand Kit/Fonts</dir>
     </fontconfig>
   '';
 
