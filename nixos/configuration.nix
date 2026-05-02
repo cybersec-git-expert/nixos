@@ -345,7 +345,7 @@ in
     libreoffice-fresh
     thunderbird
     # Graphics & audio
-    inkscape gimp mixxx
+    inkscape gimp mixxx vlc
   ];
 
   # Fonts
