@@ -37,6 +37,20 @@ let
       sleep 0.5
       "$HOME/.config/hypr/scripts/wallpaper-manager.sh" init >/dev/null 2>&1 || true
     fi
+
+    # Quickshell (TopBar/Main) can survive hibernate but stop painting; same recovery as Super+X.
+    pkill -f "quickshell.*Main.qml" >/dev/null 2>&1 || true
+    pkill -f "quickshell.*TopBar.qml" >/dev/null 2>&1 || true
+    sleep 0.7
+    if [[ -x "$HOME/.config/hypr/scripts/quickshell/autostart_quickshell.sh" ]]; then
+      mkdir -p "$HOME/.cache/quickshell"
+      nohup bash "$HOME/.config/hypr/scripts/quickshell/autostart_quickshell.sh" \
+        >>"$HOME/.cache/quickshell/resume-recover.log" 2>&1 &
+    fi
+    sleep 3
+    if [[ -x "$HOME/.config/hypr/scripts/wallpaper-manager.sh" ]]; then
+      "$HOME/.config/hypr/scripts/wallpaper-manager.sh" init >/dev/null 2>&1 || true
+    fi
   '';
 
   hyprResumeRecover = pkgs.writeShellScript "99-hypr-resume-recover.sh" ''
