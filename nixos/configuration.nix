@@ -363,6 +363,20 @@ in
     options = [ "defaults" "nofail" ];
   };
 
+  # New XFS root is root:root — without this, Dolphin shows “lock” and you cannot mkdir/rm.
+  systemd.services.media-owner-fix = {
+    description = "chown /media to cyberexpert after mount";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "media.mount" "local-fs.target" ];
+    wants = [ "media.mount" ];
+    unitConfig.ConditionPathIsMountPoint = "/media";
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.coreutils}/bin/chown cyberexpert:users /media";
+    };
+  };
+
   services.udev.extraRules = ''
     SUBSYSTEM=="block", ENV{ID_FS_UUID}=="9780cc9b-16d3-4987-808d-fbd4aace1fc3", ENV{UDISKS_IGNORE}="1"
   '';
