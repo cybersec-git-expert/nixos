@@ -1,45 +1,67 @@
+/* UI font for text; Nerd icons only on .tray-ico.vol */
 window.bar {
-  background-color: rgba(30, 30, 46, 0.92);
-  color: #cdd6f4;
-  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-  font-size: 16px;
+  background-color: rgba(24, 24, 37, 0.94);
+  color: rgba(205, 214, 244, 0.95);
+  font-family:
+    Inter,
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    Cantarell,
+    "Noto Sans",
+    sans-serif;
+  font-size: 14px;
   font-weight: 500;
-  padding: 11px 18px;
-  min-height: 3.5em;
-
+  /* Taller bar: more top/bottom padding for all content */
+  padding: 14px 18px;
+  min-height: 44px;
 }
 
-/* Inset only for the volume/network tray (matches config.js css on .right). */
-window.bar .right {
-  padding-right: 16px;
+window.bar .left {
+  padding-right: 12px;
 }
 
 window.bar label.ws {
-  color: #89b4fa;
-  font-weight: 700;
-  min-width: 2.5em;
+  color: rgba(137, 180, 250, 0.95);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  min-width: 2em;
 }
 
 window.bar label.app {
-  color: #bac2de;
-  font-weight: 600;
+  color: rgba(186, 194, 222, 0.88);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.01em;
 }
 
 window.bar label.clock {
-  color: #a6e3a1;
-  font-weight: 700;
-  font-size: 1.05em;
-}
-
-window.bar label.tray-ico {
-  font-size: 1.15em;
-  min-width: 1.35em;
+  color: rgba(205, 214, 244, 0.92);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.04em;
 }
 
 window.bar label.tray-ico.vol {
-  color: #cba6f7;
+  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+  font-size: 16px;
+  font-weight: 500;
+  min-width: 1em;
+  padding: 5px 6px;
+  /* Neutral — no accent tint */
+  color: rgba(255, 255, 255, 0.82);
 }
 
-window.bar label.tray-ico.net {
-  color: #89dceb;
+/* Tray: right inset + vertical padding so icons clear bar top/bottom */
+window.bar .right {
+  padding: 6px 10px 6px 0;
+}
+
+window.bar image.tray-ico.net {
+  color: rgba(255, 255, 255, 0.82);
+  padding: 5px 6px;
+}
+
+window.bar image.tray-ico.net.offline {
+  color: rgba(255, 255, 255, 0.82);
 }

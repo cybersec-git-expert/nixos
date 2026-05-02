@@ -64,32 +64,35 @@ function volumeGlyph() {
     )
 }
 
-function networkGlyph() {
-    return Utils.merge(
-        [
-            Network.bind('primary'),
-            Network.bind('connectivity'),
-            Network.wifi.bind('ssid'),
-            Network.wifi.bind('internet'),
-            Network.wifi.bind('strength'),
-            Network.wifi.bind('enabled'),
-            Network.wired.bind('internet'),
-        ],
-        () => {
-            if (Network.primary === 'wired')
-                return Network.wired?.internet === 'connected' ? '󰈀' : '󰈀'
-            if (Network.primary === 'wifi' && Network.wifi) {
-                const { internet, strength, enabled } = Network.wifi
-                if (!enabled || Network.connectivity === 'none') return '󰤭'
-                const tier = strength <= 25 ? 0 : strength <= 50 ? 1 : strength <= 75 ? 2 : 3
-                if (internet === 'disconnected') return ['󰤠', '󰤣', '󰤦', '󰤩'][tier]
-                if (internet === 'connected') return ['󰤟', '󰤢', '󰤥', '󰤨'][tier]
-                if (internet === 'connecting') return ['󰤡', '󰤤', '󰤧', '󰤪'][tier]
-                return '󰤯'
+/** Monitor / “PC” look (freedesktop symbolic), not Wi‑Fi waves. */
+function NetworkComputerIcon() {
+    return Widget.Icon({
+        class_name: 'tray-ico net',
+        size: 20,
+        icon: 'video-display-symbolic',
+        setup: (self) => {
+            const online = () => {
+                if (Network.primary === 'wired')
+                    return Network.wired?.internet === 'connected'
+                if (Network.primary === 'wifi' && Network.wifi) {
+                    const w = Network.wifi
+                    return (
+                        !!w.enabled &&
+                        w.internet === 'connected' &&
+                        Network.connectivity !== 'none'
+                    )
+                }
+                return false
             }
-            return '󰤮'
+            const sync = () => {
+                const on = online()
+                self.opacity = on ? 1 : 0.45
+                self.toggleClassName('offline', !on)
+            }
+            self.hook(Network, sync)
+            sync()
         },
-    )
+    })
 }
 
 const gdk = Gdk.Display.get_default()
@@ -107,7 +110,7 @@ const Bar = (monitor) =>
         child: Widget.CenterBox({
             start_widget: Widget.Box({
                 class_name: 'left',
-                spacing: 14,
+                spacing: 10,
                 hpack: 'start',
                 children: [
                     Widget.Label({
@@ -131,18 +134,14 @@ const Bar = (monitor) =>
             }),
             end_widget: Widget.Box({
                 class_name: 'right',
-                css: 'padding-right: 16px;',
-                spacing: 16,
+                spacing: 14,
                 hpack: 'end',
                 children: [
                     Widget.Label({
                         class_name: 'tray-ico vol',
                         label: volumeGlyph(),
                     }),
-                    Widget.Label({
-                        class_name: 'tray-ico net',
-                        label: networkGlyph(),
-                    }),
+                    NetworkComputerIcon(),
                 ],
             }),
         }),
