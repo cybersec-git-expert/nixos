@@ -243,6 +243,8 @@ in
     STUDIO_JDK = "${pkgs.jdk17}";
     # Flutter web — use Brave as Chrome
     CHROME_EXECUTABLE = "brave";
+    # Music library on second disk (MPD + ncmpcpp + XDG “Music” folder for apps)
+    XDG_MUSIC_DIR = "/media/Music";
   };
 
   # Audio

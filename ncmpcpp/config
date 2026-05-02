@@ -1,0 +1,5 @@
+# MPD (same host/port as ~/.config/mpd/mpd.conf)
+mpd_host = "127.0.0.1"
+mpd_port = "6600"
+# Local file browser / tag helpers — must match mpd music_directory
+mpd_music_dir = "/media/Music"
