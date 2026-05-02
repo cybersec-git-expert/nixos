@@ -2,10 +2,16 @@ window.bar {
   background-color: rgba(30, 30, 46, 0.92);
   color: #cdd6f4;
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
-  padding: 6px 14px;
-  border-bottom: 1px solid rgba(137, 180, 250, 0.35);
+  padding: 11px 18px;
+  min-height: 3.5em;
+
+}
+
+/* Inset only for the volume/network tray (matches config.js css on .right). */
+window.bar .right {
+  padding-right: 16px;
 }
 
 window.bar label.ws {
@@ -14,12 +20,26 @@ window.bar label.ws {
   min-width: 2.5em;
 }
 
-window.bar label.title {
+window.bar label.app {
   color: #bac2de;
   font-weight: 600;
 }
 
 window.bar label.clock {
   color: #a6e3a1;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.05em;
+}
+
+window.bar label.tray-ico {
+  font-size: 1.15em;
+  min-width: 1.35em;
+}
+
+window.bar label.tray-ico.vol {
+  color: #cba6f7;
+}
+
+window.bar label.tray-ico.net {
+  color: #89dceb;
 }
