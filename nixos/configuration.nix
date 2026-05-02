@@ -355,6 +355,13 @@ in
     options = [ "defaults" "nofail" ];
   };
 
+  # Second SSD: Netac/V300-style SATA disk (sda1), btrfs — was unmounted.
+  fileSystems."/Data" = {
+    device = "/dev/disk/by-uuid/4fef93d9-dc97-4449-9d3b-3e76342fc068";
+    fsType = "btrfs";
+    options = [ "defaults" "noatime" "nofail" ];
+  };
+
   services.udev.extraRules = ''
     SUBSYSTEM=="block", ENV{ID_FS_UUID}=="9780cc9b-16d3-4987-808d-fbd4aace1fc3", ENV{UDISKS_IGNORE}="1"
   '';
