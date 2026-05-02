@@ -328,6 +328,8 @@ in
     qalculate-qt
     libreoffice-fresh
     thunderbird
+    # Graphics & audio
+    inkscape gimp mixxx
   ];
 
   # Fonts
@@ -336,6 +338,15 @@ in
   [ "JetBrainsMono" ]; })  
     noto-fonts
   ];
+
+  # Extra font files on the Vault disk (TTF/OTF/…); picked up by fontconfig for all apps.
+  fonts.fontconfig.localConf = ''
+    <?xml version='1.0'?>
+    <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
+    <fontconfig>
+      <dir>/Vault/Fonts</dir>
+    </fontconfig>
+  '';
 
   # XDG Portal (needed for screen sharing, file pickers)
   xdg.portal = {
