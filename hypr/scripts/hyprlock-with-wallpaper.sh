@@ -13,7 +13,7 @@ LOCK_CACHED="${WALL_STATE_DIR}/lock_background.png"
 
 mkdir -p "${HYPRLOCK_WALL_DIR}"
 
-# Same file Quickshell Lock + wallpaper-manager init maintain (survives reboot; includes video→frame/thumb).
+# Same file wallpaper-manager init maintains (survives reboot; includes video→frame/thumb).
 if [[ -f "${LOCK_CACHED}" ]]; then
   cp -f -- "${LOCK_CACHED}" "${HYPRLOCK_WALL_DIR}/lockscreen-src.png"
   ln -sfn -- "lockscreen-src.png" "${HYPRLOCK_WALL_LINK}"

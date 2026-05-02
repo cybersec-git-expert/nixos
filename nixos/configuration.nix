@@ -38,14 +38,13 @@ let
       "$HOME/.config/hypr/scripts/wallpaper-manager.sh" init >/dev/null 2>&1 || true
     fi
 
-    # Quickshell (TopBar/Main) can survive hibernate but stop painting; same recovery as Super+X.
-    pkill -f "quickshell.*Main.qml" >/dev/null 2>&1 || true
-    pkill -f "quickshell.*TopBar.qml" >/dev/null 2>&1 || true
+    # AGS bar can survive hibernate but stop painting; restart like Super+X.
+    pkill -x ags >/dev/null 2>&1 || true
     sleep 0.7
-    if [[ -x "$HOME/.config/hypr/scripts/quickshell/autostart_quickshell.sh" ]]; then
-      mkdir -p "$HOME/.cache/quickshell"
-      nohup bash "$HOME/.config/hypr/scripts/quickshell/autostart_quickshell.sh" \
-        >>"$HOME/.cache/quickshell/resume-recover.log" 2>&1 &
+    if [[ -x "$HOME/.config/hypr/scripts/autostart_ags.sh" ]]; then
+      mkdir -p "$HOME/.cache/ags"
+      nohup bash "$HOME/.config/hypr/scripts/autostart_ags.sh" \
+        >>"$HOME/.cache/ags/resume-recover.log" 2>&1 &
     fi
     sleep 3
     if [[ -x "$HOME/.config/hypr/scripts/wallpaper-manager.sh" ]]; then
@@ -305,14 +304,14 @@ in
     # Browser & apps
     brave unstable.vscode kdePackages.dolphin kitty firefox obsidian spotify telegram-desktop
     # Hyprland bar / launcher / notifications
-    rofi-wayland
+    rofi-wayland ags
     # Hyprland extras
     hyprpaper hyprlock hypridle wlogout swww
     # Wayland tools
     wl-clipboard grim slurp swappy brightnessctl playerctl
     # Network / tray
     networkmanagerapplet xdg-utils xdg-user-dirs
-    # Quickshell + deps
+    # Matugen (theming) + AGS bar + media/deps
     matugen imagemagick mpvpaper pulseaudio dunst libnotify cryptsetup gptfdisk
     inotify-tools pamixer swayosd udiskie cliphist socat jq
     python3 dbus playerctl mpd mpc ncmpcpp cava

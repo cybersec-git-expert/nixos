@@ -1,0 +1,4 @@
+Matugen should write the flattened palette JSON to:
+  ~/.config/hypr/matugen/qs_colors.json
+Use colors.json.template in this folder as a matugen template source.
+Wallpaper flow: ~/.config/hypr/scripts/matugen/apply_matugen_wallpaper.sh
