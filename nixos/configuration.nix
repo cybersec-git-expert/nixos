@@ -355,9 +355,9 @@ in
     options = [ "defaults" "nofail" ];
   };
 
-  # Second SSD: SATA sda1, btrfs on /Data. Mount by PARTUUID so a fresh mkfs.btrfs (new FS
+  # Second SSD: SATA sda1, btrfs at /media. Mount by PARTUUID so a fresh mkfs.btrfs (new FS
   # UUID) does not require editing this file — the GPT partition id stays the same.
-  fileSystems."/Data" = {
+  fileSystems."/media" = {
     device = "/dev/disk/by-partuuid/f3805ff9-96b0-4326-ba8c-c271e17aec82";
     fsType = "btrfs";
     options = [ "defaults" "noatime" "ssd" "discard=async" "nofail" ];
