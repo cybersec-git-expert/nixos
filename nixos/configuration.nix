@@ -355,11 +355,12 @@ in
     options = [ "defaults" "nofail" ];
   };
 
-  # Second SSD: Netac/V300-style SATA disk (sda1), btrfs — was unmounted.
+  # Second SSD: SATA sda1, btrfs on /Data. Mount by PARTUUID so a fresh mkfs.btrfs (new FS
+  # UUID) does not require editing this file — the GPT partition id stays the same.
   fileSystems."/Data" = {
-    device = "/dev/disk/by-uuid/4fef93d9-dc97-4449-9d3b-3e76342fc068";
+    device = "/dev/disk/by-partuuid/f3805ff9-96b0-4326-ba8c-c271e17aec82";
     fsType = "btrfs";
-    options = [ "defaults" "noatime" "nofail" ];
+    options = [ "defaults" "noatime" "ssd" "discard=async" "nofail" ];
   };
 
   services.udev.extraRules = ''
