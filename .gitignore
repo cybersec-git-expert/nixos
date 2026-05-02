@@ -24,6 +24,12 @@
 !hyprlock/
 !hyprlock/**
 
+# AGS bar (~/.config/ags)
+!ags/
+!ags/**
+# Symlink to nix store (ags --init); do not commit
+ags/types
+
 # Terminal + music stack
 !kitty/
 !kitty/**

@@ -1,0 +1,25 @@
+window.bar {
+  background-color: rgba(30, 30, 46, 0.92);
+  color: #cdd6f4;
+  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgba(137, 180, 250, 0.35);
+}
+
+window.bar label.ws {
+  color: #89b4fa;
+  font-weight: 700;
+  min-width: 2.5em;
+}
+
+window.bar label.title {
+  color: #bac2de;
+  font-weight: 600;
+}
+
+window.bar label.clock {
+  color: #a6e3a1;
+  font-weight: 600;
+}
