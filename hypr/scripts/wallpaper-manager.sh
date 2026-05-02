@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Simple wallpaper restore helper for Hyprland + swww/mpvpaper.
 # Used by ~/.config/hypr/autostart.conf: `wallpaper-manager.sh init`
+#
+# Dual-monitor "flow" (one image split across two outputs, top/bottom or left/right):
+#   wallpaper-manager.sh apply-flow vertical|horizontal /path/to/image.png
+# See wallpaper-flow-split.sh (ImageMagick + hyprctl monitor order).
 set -euo pipefail
 
 cmd="${1:-}"
 WALL_DIR="${HOME}/.config/wallpaper-manager"
 WALL_FILE_TXT="${WALL_DIR}/current_wallpaper.txt"
 WALL_OUTPUTS_TXT="${WALL_DIR}/current_wallpaper_outputs.txt"
+WALL_FLOW_TXT="${WALL_DIR}/current_wallpaper_flow.txt"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Persists across reboot (/tmp is cleared). Quickshell Lock + hyprlock use this.
 LOCK_BG_PERSIST="${WALL_DIR}/lock_background.png"
 THUMB_CACHE="${HOME}/.cache/wallpaper_picker/thumbs"
@@ -80,6 +86,30 @@ apply_wallpaper() {
     return 0
   fi
 
+  local flow="none"
+  if [[ -f "$WALL_FLOW_TXT" ]]; then
+    flow="$(tr '[:upper:]' '[:lower:]' <"$WALL_FLOW_TXT" | tr -d '\r\n' | head -c64)"
+  fi
+  if [[ "$flow" == "vertical" || "$flow" == "horizontal" ]]; then
+    ensure_swww
+    # Same Hyprland env as wallpaper-flow-split.sh (detached pickers often lack these).
+    [[ -n "${XDG_RUNTIME_DIR:-}" ]] || export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+      for _hdir in "$XDG_RUNTIME_DIR/hypr"/*; do
+        [[ -d "$_hdir" ]] || continue
+        export HYPRLAND_INSTANCE_SIGNATURE="$(basename "$_hdir")"
+        break
+      done
+    fi
+    if "${SCRIPT_DIR}/wallpaper-flow-split.sh" "$flow" "$wp"; then
+      sync_lock_background "$wp"
+      return 0
+    fi
+    echo "wallpaper-manager: flow wallpaper failed (see wallpaper-flow-split messages); not changing swww" >&2
+    sync_lock_background "$wp"
+    return 0
+  fi
+
   ensure_swww
   if command -v swww >/dev/null 2>&1; then
     # Hyprland outputs are not always ready immediately after login; retry a few times.
@@ -129,12 +159,27 @@ case "$cmd" in
     wp="${2:-}"
     outputs="${3:-*}"
     mkdir -p "$WALL_DIR"
+    printf '%s\n' none > "$WALL_FLOW_TXT"
     printf '%s\n' "$wp" > "$WALL_FILE_TXT"
     printf '%s\n' "$outputs" > "$WALL_OUTPUTS_TXT"
     apply_wallpaper "$wp" "$outputs"
     ;;
+  apply-flow)
+    # wallpaper-manager.sh apply-flow vertical|horizontal /path/to/image
+    mode="${2:-}"
+    wp="${3:-}"
+    if [[ "$mode" != "vertical" && "$mode" != "horizontal" ]]; then
+      echo "Usage: $(basename "$0") apply-flow vertical|horizontal /path/to/wallpaper" >&2
+      exit 2
+    fi
+    mkdir -p "$WALL_DIR"
+    printf '%s\n' "$mode" > "$WALL_FLOW_TXT"
+    printf '%s\n' "$wp" > "$WALL_FILE_TXT"
+    printf '%s\n' '*' > "$WALL_OUTPUTS_TXT"
+    apply_wallpaper "$wp" "*"
+    ;;
   *)
-    echo "Usage: $(basename "$0") init | apply /path/to/wallpaper"
+    echo "Usage: $(basename "$0") init | apply /path/to/wallpaper [outputs] | apply-flow vertical|horizontal /path/to/wallpaper"
     exit 2
     ;;
 esac

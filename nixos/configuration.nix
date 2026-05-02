@@ -283,6 +283,8 @@ in
   services.jackett = {
     enable = true;
     openFirewall = false;
+    # nixpkgs 24.11 jackett-0.22.893: NUnit reports 2 failures in checkPhase (blocks rebuild).
+    package = pkgs.jackett.overrideAttrs (_: { doCheck = false; });
   };
 
   # Printing — CUPS with Epson L130 driver

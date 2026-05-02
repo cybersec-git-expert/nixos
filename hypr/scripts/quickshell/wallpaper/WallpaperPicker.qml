@@ -33,17 +33,25 @@ Item {
     // Hyprland outputs (as seen in `hyprctl monitors`):
     // - Monitor 1 (MSI): HDMI-A-1
     // - Monitor 2 (HP) : DP-3
+    // "Flow" modes ignore these names and use monitor sort order from hyprctl (y for stacked, x for wide).
     readonly property string outputMon1: "HDMI-A-1"
     readonly property string outputMon2: "DP-3"
 
     Settings {
         id: outputPrefs
         category: "QS_WallpaperPicker"
-        // "both" | "mon1" | "mon2"
+        // "both" | "mon1" | "mon2" | "flow_v" | "flow_h"
         property string targetOutputsMode: "both"
     }
 
+    function flowApplyMode() {
+        if (outputPrefs.targetOutputsMode === "flow_v") return "vertical";
+        if (outputPrefs.targetOutputsMode === "flow_h") return "horizontal";
+        return "";
+    }
+
     function selectedOutputs() {
+        if (outputPrefs.targetOutputsMode === "flow_v" || outputPrefs.targetOutputsMode === "flow_h") return "";
         if (outputPrefs.targetOutputsMode === "mon1") return outputMon1;
         if (outputPrefs.targetOutputsMode === "mon2") return outputMon2;
         // Empty means "all outputs" for swww (we omit --outputs)
@@ -51,6 +59,8 @@ Item {
     }
 
     function selectedOutputsLabel() {
+        if (outputPrefs.targetOutputsMode === "flow_v") return "Flow (stacked)";
+        if (outputPrefs.targetOutputsMode === "flow_h") return "Flow (wide)";
         if (outputPrefs.targetOutputsMode === "mon1") return "Monitor 1";
         if (outputPrefs.targetOutputsMode === "mon2") return "Monitor 2";
         return "Both";
@@ -139,7 +149,8 @@ Item {
         const randomTransition = window.transitions[Math.floor(Math.random() * window.transitions.length)];
         const outputsValue = window.selectedOutputs();
         const outputsValueForFile = outputsValue === "" ? "*" : outputsValue;
-        
+        const flowApply = isVideo ? "" : window.flowApplyMode();
+
         // 3. AUTO-REVIVE COMMAND: Ensure daemon is alive before sending IPC commands
         const ensureDaemonCmd = `if ! pgrep -x "swww-daemon" > /dev/null; then swww-daemon >/dev/null 2>&1 & sleep 0.2; fi`;
         
@@ -165,6 +176,7 @@ Item {
                         export FINAL_THUMB="${escapeBash(finalThumb)}"
                         export RELOAD_SCRIPT="${escapeBash(reloadScript)}"
                         export OUTPUTS_VALUE="${escapeBash(outputsValue)}"
+                        export FLOW_APPLY="${escapeBash(flowApply)}"
                         
                         mkdir -p "$HOME/.config/wallpaper-manager"
                         cp "$DEST_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" || true
@@ -177,24 +189,25 @@ Item {
                         ( bash "${escApplyColors}" "$FINAL_THUMB" || true ) &
                         MATUGEN_PID=$!
                         
-                            # Build optional --outputs args (if OUTPUTS_VALUE is empty => apply to all)
+                        if [ -n "$FLOW_APPLY" ]; then
+                            "$HOME/.config/hypr/scripts/wallpaper-manager.sh" apply-flow "$FLOW_APPLY" "$DEST_FILE"
+                        else
                             OUT_ARGS=()
                             if [ -n "$OUTPUTS_VALUE" ]; then
                                 OUT_ARGS+=(--outputs "$OUTPUTS_VALUE")
                             fi
-
-                            # GRACEFUL FALLBACK LOOP: Try Vulkan first, fallback to default immediately if it fails
-                        for i in {1..20}; do
-                            if env WGPU_BACKEND=vulkan swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
-                                break
-                            elif swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
-                                break
-                            fi
-                            sleep 0.05
-                        done
-                        mkdir -p "$HOME/.config/wallpaper-manager"
-                        printf '%s\\n' "$DEST_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
-                        printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"
+                            for i in {1..20}; do
+                                if env WGPU_BACKEND=vulkan swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                                    break
+                                elif swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                                    break
+                                fi
+                                sleep 0.05
+                            done
+                            mkdir -p "$HOME/.config/wallpaper-manager"
+                            printf '%s\\n' "$DEST_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
+                            printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"
+                        fi
                         
                         wait $MATUGEN_PID
                     ) </dev/null >/dev/null 2>&1 & disown
@@ -214,6 +227,7 @@ Item {
                     export RELOAD_SCRIPT="${escapeBash(reloadScript)}"
                     export MAP_FILE="${escapeBash(mapFile)}"
                     export OUTPUTS_VALUE="${escapeBash(outputsValue)}"
+                    export FLOW_APPLY="${escapeBash(flowApply)}"
                     
                     (
                         URL=$(awk -F'|' -v fname="$SAFE_NAME" '$1 == fname {print $2; exit}' "$MAP_FILE")
@@ -242,24 +256,25 @@ Item {
                             ( bash "${escApplyColors}" "$FINAL_THUMB" || true ) &
                             MATUGEN_PID=$!
                             
-                            # Build optional --outputs args (if OUTPUTS_VALUE is empty => apply to all)
-                            OUT_ARGS=()
-                            if [ -n "$OUTPUTS_VALUE" ]; then
-                                OUT_ARGS+=(--outputs "$OUTPUTS_VALUE")
-                            fi
-
-                            # GRACEFUL FALLBACK LOOP
-                            for i in {1..20}; do
-                                if env WGPU_BACKEND=vulkan swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
-                                    break
-                                elif swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
-                                    break
+                            if [ -n "$FLOW_APPLY" ]; then
+                                "$HOME/.config/hypr/scripts/wallpaper-manager.sh" apply-flow "$FLOW_APPLY" "$DEST_FILE"
+                            else
+                                OUT_ARGS=()
+                                if [ -n "$OUTPUTS_VALUE" ]; then
+                                    OUT_ARGS+=(--outputs "$OUTPUTS_VALUE")
                                 fi
-                                sleep 0.05
-                            done
-                            mkdir -p "$HOME/.config/wallpaper-manager"
-                            printf '%s\\n' "$DEST_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
-                            printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"
+                                for i in {1..20}; do
+                                    if env WGPU_BACKEND=vulkan swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                                        break
+                                    elif swww img "$DEST_FILE" "\${OUT_ARGS[@]}" --resize crop --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                                        break
+                                    fi
+                                    sleep 0.05
+                                done
+                                mkdir -p "$HOME/.config/wallpaper-manager"
+                                printf '%s\\n' "$DEST_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
+                                printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"
+                            fi
                             
                             wait $MATUGEN_PID
                         fi
@@ -283,6 +298,12 @@ Item {
         if (isVideo) {
             wallpaperCmd = `mpvpaper -o 'loop --no-audio --hwdec=auto --profile=high-quality --video-sync=display-resample --interpolation --tscale=oversample' "\${OUTPUTS_VALUE:-*}" "$WALL_FILE"`
             lockBgCmd = `mkdir -p "$HOME/.config/wallpaper-manager" && cp "$THUMB_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" && cp "$THUMB_FILE" /tmp/lock_bg.png`
+        } else if (flowApply) {
+            wallpaperCmd = `
+                ${ensureDaemonCmd}
+                "$HOME/.config/hypr/scripts/wallpaper-manager.sh" apply-flow "${escapeBash(flowApply)}" "$WALL_FILE"
+            `
+            lockBgCmd = `mkdir -p "$HOME/.config/wallpaper-manager" && cp "$WALL_FILE" "$HOME/.config/wallpaper-manager/lock_background.png" && cp "$WALL_FILE" /tmp/lock_bg.png`
         } else {
             wallpaperCmd = `
                 ${ensureDaemonCmd}
@@ -325,8 +346,8 @@ Item {
                 
                 ${wallpaperCmd}
                 mkdir -p "$HOME/.config/wallpaper-manager"
-                printf '%s\\n' "$WALL_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
-                printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"
+                ${flowApply ? `true` : `printf '%s\\n' "$WALL_FILE" > "$HOME/.config/wallpaper-manager/current_wallpaper.txt"
+                printf '%s\\n' "${escapeBash(outputsValueForFile)}" > "$HOME/.config/wallpaper-manager/current_wallpaper_outputs.txt"`}
                 
                 wait $MATUGEN_PID
             ) </dev/null >/dev/null 2>&1 & disown
@@ -1451,7 +1472,9 @@ Item {
                             model: [
                                 ({ label: "Both", mode: "both" }),
                                 ({ label: "Monitor 1", mode: "mon1" }),
-                                ({ label: "Monitor 2", mode: "mon2" })
+                                ({ label: "Monitor 2", mode: "mon2" }),
+                                ({ label: "Flow (stacked)", mode: "flow_v" }),
+                                ({ label: "Flow (wide)", mode: "flow_h" })
                             ]
                             delegate: Rectangle {
                                 width: parent.width
