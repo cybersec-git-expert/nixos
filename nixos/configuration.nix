@@ -276,6 +276,15 @@ in
   services.udisks2.enable = true;
   services.gvfs.enable = true;
 
+  # Jackett — qBittorrent “Jackett” search plugin needs a real API key in
+  # ~/.local/share/qBittorrent/nova3/engines/jackett.json (replace YOUR_API_KEY_HERE).
+  # After `nixos-rebuild switch`: `sudo systemctl start jackett`, open http://127.0.0.1:9117 ,
+  # then: `sudo jq -r .APIKey /var/lib/jackett/.config/Jackett/ServerConfig.json`
+  services.jackett = {
+    enable = true;
+    openFirewall = false;
+  };
+
   # Printing — CUPS with Epson L130 driver
   services.printing = {
     enable = true;
