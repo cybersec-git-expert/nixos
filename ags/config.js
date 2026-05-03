@@ -16,6 +16,9 @@ const TRAY_ICON_PX = 16
  */
 const BAR_CLEARANCE_PX = 72
 
+/** Snap workspace id to HP (odd) or MSI (even), then focus — matches Hyprland keybinds. */
+const WORKSPACE_GOTO = `${GLib.get_home_dir()}/.config/hypr/scripts/workspace-goto.sh`
+
 const time = Variable('', {
     poll: [1000, () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })],
 })
@@ -155,7 +158,7 @@ function WorkspacePills(gdkIdx) {
                         valign: 'center',
                         tooltip_text: `Workspace ${id}`,
                         on_clicked: () => {
-                            Hyprland.message(`dispatch workspace ${id}`)
+                            Utils.exec(['bash', WORKSPACE_GOTO, String(id)])
                         },
                     }),
                 )
