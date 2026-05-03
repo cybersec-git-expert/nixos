@@ -303,10 +303,10 @@ const Bar = (monitor) =>
                 hpack: 'end',
                 children: [
                     TraySlot(VpnTrayIcon()),
-                    TraySlot(BluetoothTrayIcon()),
                     TraySlot(MicTray()),
-                    TraySlot(VolumeTray()),
+                    TraySlot(BluetoothTrayIcon()),
                     TraySlot(NetworkComputerIcon()),
+                    TraySlot(VolumeTray()),
                 ],
             }),
         }),
