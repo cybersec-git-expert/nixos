@@ -188,12 +188,9 @@ function formatUpsCaption(p, connected) {
         }
     }
     if (p.onBattery) {
-        let line2 = `${p.pct}%`
-        const t = p.timeToEmpty
-        if (t && !/^0(\.0)?\s*s/i.test(t) && !/^unknown/i.test(t) && t.length < 14) line2 = `${p.pct}% · ${t}`
         return {
-            line1: 'On battery',
-            line2,
+            line1: `${p.pct}%`,
+            line2: '',
             detail: `On battery · ${p.pct}%${p.timeToEmpty ? ` · ${p.timeToEmpty}` : ''}\nState: ${p.state || '—'}`,
         }
     }
@@ -240,7 +237,7 @@ function maybeUpsEmergencyShutdown(parsed) {
 
 const upsStatus = Variable(UPS_STATUS_EMPTY, {
     poll: [
-        10_000,
+        3_000,
         () => {
             try {
                 const path = upowerUpsPath()
@@ -1928,6 +1925,49 @@ function VpnTrayIcon(/** @type {number} */ m) {
     })
 }
 
+/** Bar: only while UPS is on battery (mains lost); click opens quick settings. */
+function UpsBarTray(/** @type {number} */ m) {
+    const icon = Widget.Icon({ class_name: 'tray-ico', size: TRAY_ICON_PX, icon: 'battery-good-symbolic' })
+    const lbl = Widget.Label({ class_name: 'ups-tray-pct', label: '', valign: 'center' })
+    return Widget.EventBox({
+        class_name: 'ups-tray',
+        cursor: 'pointer',
+        tooltip_text: 'UPS',
+        on_primary_click: () => toggleQuickSettings(m),
+        child: Widget.Box({
+            class_name: 'ups-tray-inner',
+            spacing: 4,
+            valign: 'center',
+            children: [icon, lbl],
+        }),
+        setup: (/** @type {any} */ self) => {
+            /** @param {any} slot */
+            self.syncUpsTray = (slot) => {
+                let j = {}
+                try {
+                    const raw = upsStatus.value
+                    j = JSON.parse(typeof raw === 'string' ? raw : '{}')
+                } catch {
+                    j = {}
+                }
+                const pct = j.pct != null ? Number(j.pct) : NaN
+                const show = !!(j.connected && j.onBattery && !Number.isNaN(pct))
+                slot.visible = show
+                if (!show) return
+                const p = {
+                    pct,
+                    state: String(j.state || ''),
+                    onBattery: !!j.onBattery,
+                    timeToEmpty: String(j.timeToEmpty || ''),
+                }
+                icon.icon = pickUpsIcon(p, true)
+                lbl.label = `${pct}%`
+                self.tooltip_text = `UPS on battery · ${pct}% · click for quick settings`
+            }
+        },
+    })
+}
+
 function BluetoothTrayIcon(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'bt-tray',
@@ -2157,6 +2197,14 @@ const Bar = (monitor) =>
                                 s === 'connected' || s === 'connecting' || s === 'disconnecting'
                         }
                         slot.hook(Network, sync)
+                        sync()
+                    }),
+                    TraySlotWhenActive(UpsBarTray(monitor), (slot) => {
+                        const ev = slot.child
+                        const sync = () => {
+                            if (typeof ev.syncUpsTray === 'function') ev.syncUpsTray(slot)
+                        }
+                        slot.hook(upsStatus, sync)
                         sync()
                     }),
                     TraySlotWhenActive(MicTray(monitor), (slot) => {

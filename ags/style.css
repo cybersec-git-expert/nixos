@@ -99,6 +99,18 @@ window.bar image.tray-ico.offline {
   color: rgba(255, 255, 255, 0.88);
 }
 
+/* UPS on battery — bar indicator (with %) */
+window.bar .ups-tray-inner image.tray-ico {
+  color: rgba(255, 200, 120, 0.98);
+}
+
+window.bar .ups-tray-inner label.ups-tray-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 210, 130, 0.98);
+  min-width: 2.2em;
+}
+
 /* Bell glyph (Nerd Font) — matches tray icon size */
 window.bar label.tray-bell {
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
