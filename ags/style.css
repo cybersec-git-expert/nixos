@@ -1,12 +1,14 @@
+/* Distinct UI type — install DM Sans / Plus Jakarta for best match */
 window.bar {
   background-color: rgba(24, 24, 37, 0.94);
-  color: rgba(205, 214, 244, 0.95);
+  color: rgba(230, 232, 250, 0.96);
   font-family:
+    "DM Sans",
+    "Plus Jakarta Sans",
     Inter,
     "Segoe UI Variable Text",
     "Segoe UI",
-    Cantarell,
-    "Noto Sans",
+    system-ui,
     sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -15,44 +17,79 @@ window.bar {
 }
 
 window.bar .left {
-  padding-right: 12px;
+  padding-right: 8px;
 }
 
-window.bar label.ws {
-  color: rgba(137, 180, 250, 0.95);
+/* ---- Workspaces (no pill / circle background) ---- */
+window.bar button.ws-pill {
+  background: transparent;
+  color: rgba(230, 232, 250, 0.72);
+  border: none;
+  border-radius: 0;
+  padding: 2px 8px;
+  margin: 0;
   font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  min-width: 2em;
+  font-size: 12px;
+  font-family: inherit;
+  min-height: 0;
+  box-shadow: none;
 }
 
+window.bar button.ws-pill:hover {
+  color: rgba(230, 232, 250, 0.95);
+}
+
+window.bar button.ws-pill.active {
+  background: transparent;
+  color: #89b4fa;
+  border: none;
+}
+
+window.bar separator.title-sep {
+  margin: 0 2px;
+  min-width: 1px;
+  min-height: 22px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---- Window title ---- */
 window.bar label.app {
-  color: rgba(186, 194, 222, 0.88);
+  color: rgba(198, 206, 245, 0.88);
   font-weight: 400;
   font-size: 13px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
+}
+
+/* ---- Clock (no chip / circle background) ---- */
+window.bar .clock-wrap {
+  padding: 0 4px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
+window.bar image.clock-ico {
+  color: rgba(180, 190, 254, 0.95);
 }
 
 window.bar label.clock {
-  color: rgba(205, 214, 244, 0.92);
+  color: rgba(236, 240, 255, 0.95);
   font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.04em;
+  font-size: 15px;
+  letter-spacing: 0.06em;
 }
 
-/* Tray: tight gap between items; vertical breathing room */
+/* ---- Tray (unchanged layout) ---- */
 window.bar .right {
   padding: 6px 10px 6px 0;
 }
 
-/* Same cell for every control — icons align to one grid */
 window.bar .tray-slot {
   min-width: 28px;
   min-height: 28px;
   padding: 0 1px;
 }
 
-/* One size + one color for all symbolic tray glyphs */
 window.bar image.tray-ico {
   color: rgba(255, 255, 255, 0.88);
 }

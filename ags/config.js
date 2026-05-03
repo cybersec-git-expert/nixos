@@ -34,17 +34,61 @@ function hyprMonitorForGdk(gdkIdx) {
     return match ?? Hyprland.monitors[gdkIdx]
 }
 
-/** Workspace ids on this monitor, active in brackets. */
-function workspacesLabel(gdkIdx) {
-    return Utils.merge([Hyprland.bind('workspaces'), Hyprland.bind('monitors')], () => {
-        const mon = hyprMonitorForGdk(gdkIdx)
-        if (!mon) return '—'
-        const strip = Hyprland.workspaces
-            .filter((w) => w.monitorID === mon.id)
-            .sort((a, b) => a.id - b.id)
-            .map((w) => (mon.activeWorkspace.id === w.id ? `[${w.id}]` : ` ${w.id} `))
-            .join('')
-        return strip.trim() || `[${mon.activeWorkspace.id}]`
+/** Rounded workspace pills for this monitor (click to switch). */
+function WorkspacePills(gdkIdx) {
+    return Widget.Box({
+        class_name: 'workspace-pills',
+        spacing: 6,
+        valign: 'center',
+        setup: (self) => {
+            const sync = () => {
+                const mon = hyprMonitorForGdk(gdkIdx)
+                if (!mon) {
+                    self.children = []
+                    return
+                }
+                const ids = Hyprland.workspaces
+                    .filter((w) => w.monitorID === mon.id)
+                    .sort((a, b) => a.id - b.id)
+                    .map((w) => w.id)
+                const active = mon.activeWorkspace.id
+                self.children = ids.map((id) =>
+                    Widget.Button({
+                        class_name: `ws-pill${id === active ? ' active' : ''}`,
+                        label: String(id),
+                        cursor: 'pointer',
+                        valign: 'center',
+                        tooltip_text: `Workspace ${id}`,
+                        on_clicked: () => {
+                            Hyprland.message(`dispatch workspace ${id}`)
+                        },
+                    }),
+                )
+            }
+            self.hook(Hyprland, sync)
+            sync()
+        },
+    })
+}
+
+function ClockBlock() {
+    return Widget.Box({
+        class_name: 'clock-wrap',
+        valign: 'center',
+        hpack: 'center',
+        spacing: 8,
+        children: [
+            Widget.Icon({
+                class_name: 'clock-ico',
+                size: 18,
+                icon: 'preferences-system-time-symbolic',
+            }),
+            Widget.Label({
+                class_name: 'clock',
+                xalign: 0,
+                label: time.bind(),
+            }),
+        ],
     })
 }
 
@@ -275,13 +319,14 @@ const Bar = (monitor) =>
         child: Widget.CenterBox({
             start_widget: Widget.Box({
                 class_name: 'left',
-                spacing: 10,
+                spacing: 12,
                 hpack: 'start',
+                valign: 'center',
                 children: [
-                    Widget.Label({
-                        class_name: 'ws',
-                        xalign: 0,
-                        label: workspacesLabel(monitor),
+                    WorkspacePills(monitor),
+                    Widget.Separator({
+                        class_name: 'title-sep',
+                        vertical: true,
                     }),
                     Widget.Label({
                         class_name: 'app',
@@ -292,11 +337,7 @@ const Bar = (monitor) =>
                     }),
                 ],
             }),
-            center_widget: Widget.Label({
-                class_name: 'clock',
-                xalign: 0.5,
-                label: time.bind(),
-            }),
+            center_widget: ClockBlock(),
             end_widget: Widget.Box({
                 class_name: 'right',
                 spacing: 4,
