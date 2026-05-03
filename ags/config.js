@@ -3,6 +3,7 @@ import Hyprland from 'resource:///com/github/Aylur/ags/service/hyprland.js'
 import Audio from 'resource:///com/github/Aylur/ags/service/audio.js'
 import Bluetooth from 'resource:///com/github/Aylur/ags/service/bluetooth.js'
 import Network from 'resource:///com/github/Aylur/ags/service/network.js'
+import Notifications from 'resource:///com/github/Aylur/ags/service/notifications.js'
 import Utils from 'resource:///com/github/Aylur/ags/utils.js'
 
 /** All tray Gtk.Image icons use the same pixel size so they align visually. */
@@ -10,6 +11,19 @@ const TRAY_ICON_PX = 16
 
 const time = Variable('', {
     poll: [1000, () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })],
+})
+
+const dateLong = Variable('', {
+    poll: [
+        60_000,
+        () =>
+            new Date().toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            }),
+    ],
 })
 
 /** Fixed-width cell so every tray control lines up the same. */
@@ -71,24 +85,191 @@ function WorkspacePills(gdkIdx) {
     })
 }
 
-function ClockBlock() {
+function notificationCenterName(/** @type {number} */ m) {
+    return `notificationCenter${m}`
+}
+
+/** @param {any} n */
+function notificationRow(n) {
+    const ts = n.time
+    const when = new Date(ts > 1e12 ? ts : ts * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    })
     return Widget.Box({
-        class_name: 'clock-wrap',
-        valign: 'center',
-        hpack: 'center',
-        spacing: 8,
+        class_name: 'nc-notif',
+        vertical: true,
         children: [
-            Widget.Icon({
-                class_name: 'clock-ico',
-                size: 18,
-                icon: 'preferences-system-time-symbolic',
-            }),
-            Widget.Label({
-                class_name: 'clock',
-                xalign: 0,
-                label: time.bind(),
+            Widget.Box({
+                class_name: 'nc-notif-head',
+                valign: 'start',
+                spacing: 10,
+                children: [
+                    Widget.Icon({
+                        class_name: 'nc-notif-ico',
+                        size: 28,
+                        icon: n.app_icon || 'dialog-information-symbolic',
+                    }),
+                    Widget.Box({
+                        vertical: true,
+                        hexpand: true,
+                        spacing: 4,
+                        children: [
+                            Widget.Box({
+                                children: [
+                                    Widget.Label({
+                                        class_name: 'nc-app',
+                                        xalign: 0,
+                                        hexpand: true,
+                                        truncate: 'end',
+                                        label: n.app_name,
+                                    }),
+                                    Widget.Label({
+                                        class_name: 'nc-time',
+                                        xalign: 1,
+                                        label: when,
+                                    }),
+                                ],
+                            }),
+                            Widget.Label({
+                                class_name: 'nc-sum',
+                                xalign: 0,
+                                wrap: true,
+                                label: n.summary,
+                            }),
+                            Widget.Label({
+                                class_name: 'nc-body',
+                                xalign: 0,
+                                wrap: true,
+                                visible: !!n.body,
+                                label: n.body || '',
+                            }),
+                        ],
+                    }),
+                    Widget.Button({
+                        class_name: 'nc-dismiss',
+                        label: '×',
+                        valign: 'start',
+                        tooltip_text: 'Dismiss',
+                        on_clicked: () => {
+                            n.close()
+                        },
+                    }),
+                ],
             }),
         ],
+    })
+}
+
+function NotificationList() {
+    return Widget.Box({
+        vertical: true,
+        spacing: 0,
+        setup: (self) => {
+            const sync = () => {
+                const list = [...Notifications.notifications].sort((a, b) => b.time - a.time)
+                if (list.length === 0) {
+                    self.children = [
+                        Widget.Label({
+                            class_name: 'nc-empty',
+                            wrap: true,
+                            label:
+                                'No notifications here.\nIf you use Dunst as the daemon, history stays in Dunst — try `dunstctl history`.',
+                        }),
+                    ]
+                    return
+                }
+                self.children = list.map((n) => notificationRow(n))
+            }
+            self.hook(Notifications, sync)
+            sync()
+        },
+    })
+}
+
+/** @param {number} monitor Gdk index — panel anchors top-right on that output. */
+function NotificationCenterPanel(monitor) {
+    return Widget.Window({
+        monitor,
+        name: notificationCenterName(monitor),
+        class_name: 'nc-panel',
+        anchor: ['top', 'right'],
+        exclusivity: 'normal',
+        layer: 'overlay',
+        margins: [52, 16, 0, 0],
+        visible: false,
+        child: Widget.Box({
+            vertical: true,
+            class_name: 'nc-inner',
+            children: [
+                Widget.Box({
+                    class_name: 'nc-header',
+                    valign: 'center',
+                    children: [
+                        Widget.Label({
+                            class_name: 'nc-heading',
+                            hexpand: true,
+                            xalign: 0,
+                            label: 'Notifications',
+                        }),
+                        Widget.Button({
+                            class_name: 'nc-clear',
+                            label: 'Clear all',
+                            on_clicked: () => {
+                                Notifications.clear().catch(() => {})
+                            },
+                        }),
+                    ],
+                }),
+                Widget.Scrollable({
+                    class_name: 'nc-scroll',
+                    vscroll: 'always',
+                    hscroll: 'never',
+                    css: 'min-height: 140px;',
+                    child: NotificationList(),
+                }),
+                Widget.Separator({ class_name: 'nc-sep' }),
+                Widget.Label({
+                    class_name: 'nc-date',
+                    xalign: 0,
+                    label: dateLong.bind(),
+                }),
+                Widget.Calendar({
+                    class_name: 'nc-calendar',
+                }),
+            ],
+        }),
+    })
+}
+
+/** @param {number} gdkMonitor */
+function ClockBlock(gdkMonitor) {
+    const wname = notificationCenterName(gdkMonitor)
+    return Widget.EventBox({
+        class_name: 'clock-hit',
+        cursor: 'pointer',
+        tooltip_text: 'Notifications & calendar',
+        on_primary_click: () => {
+            App.toggleWindow(wname)
+        },
+        child: Widget.Box({
+            class_name: 'clock-wrap',
+            valign: 'center',
+            hpack: 'center',
+            spacing: 8,
+            children: [
+                Widget.Icon({
+                    class_name: 'clock-ico',
+                    size: 18,
+                    icon: 'preferences-system-time-symbolic',
+                }),
+                Widget.Label({
+                    class_name: 'clock',
+                    xalign: 0,
+                    label: time.bind(),
+                }),
+            ],
+        }),
     })
 }
 
@@ -337,7 +518,7 @@ const Bar = (monitor) =>
                     }),
                 ],
             }),
-            center_widget: ClockBlock(),
+            center_widget: ClockBlock(monitor),
             end_widget: Widget.Box({
                 class_name: 'right',
                 spacing: 4,
@@ -353,7 +534,10 @@ const Bar = (monitor) =>
         }),
     })
 
+const bars = [...Array(nMon).keys()].map((i) => Bar(i))
+const panels = [...Array(nMon).keys()].map((i) => NotificationCenterPanel(i))
+
 App.config({
     style: `${App.configDir}/style.css`,
-    windows: [...Array(nMon).keys()].map((i) => Bar(i)),
+    windows: [...bars, ...panels],
 })

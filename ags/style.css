@@ -97,3 +97,111 @@ window.bar image.tray-ico {
 window.bar image.tray-ico.offline {
   color: rgba(255, 255, 255, 0.88);
 }
+
+window.bar eventbox.clock-hit {
+  border-radius: 0;
+}
+
+/* ---- Notification center + calendar (clock click) ---- */
+window.nc-panel {
+  font-family:
+    "DM Sans",
+    "Plus Jakarta Sans",
+    Inter,
+    "Segoe UI Variable Text",
+    system-ui,
+    sans-serif;
+}
+
+window.nc-panel .nc-inner {
+  min-width: 340px;
+  padding: 14px 16px 16px;
+  background-color: rgba(30, 30, 40, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: rgba(230, 232, 250, 0.95);
+}
+
+window.nc-panel .nc-header {
+  margin-bottom: 10px;
+}
+
+window.nc-panel label.nc-heading {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+window.nc-panel button.nc-clear {
+  background: transparent;
+  color: rgba(137, 180, 250, 0.95);
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+window.nc-panel button.nc-clear:hover {
+  color: #b4c6ff;
+}
+
+window.nc-panel label.nc-empty {
+  font-size: 12px;
+  color: rgba(180, 190, 220, 0.75);
+  padding: 8px 4px 12px;
+}
+
+window.nc-panel .nc-notif {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+window.nc-panel label.nc-app {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+window.nc-panel label.nc-time {
+  font-size: 12px;
+  color: rgba(180, 190, 220, 0.75);
+}
+
+window.nc-panel label.nc-sum {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+window.nc-panel label.nc-body {
+  font-size: 12px;
+  color: rgba(198, 206, 245, 0.85);
+}
+
+window.nc-panel button.nc-dismiss {
+  background: transparent;
+  border: none;
+  color: rgba(230, 232, 250, 0.55);
+  font-size: 18px;
+  padding: 0 4px;
+  min-width: 28px;
+}
+
+window.nc-panel button.nc-dismiss:hover {
+  color: rgba(243, 139, 168, 0.95);
+}
+
+window.nc-panel separator.nc-sep {
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+window.nc-panel label.nc-date {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+window.nc-panel calendar.nc-calendar {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 6px;
+}
+
