@@ -1,4 +1,3 @@
-/* UI font for text; Nerd icons only on .tray-ico.vol */
 window.bar {
   background-color: rgba(24, 24, 37, 0.94);
   color: rgba(205, 214, 244, 0.95);
@@ -11,7 +10,6 @@ window.bar {
     sans-serif;
   font-size: 14px;
   font-weight: 500;
-  /* Taller bar: more top/bottom padding for all content */
   padding: 14px 18px;
   min-height: 44px;
 }
@@ -42,32 +40,23 @@ window.bar label.clock {
   letter-spacing: 0.04em;
 }
 
-window.bar label.tray-ico.vol,
-window.bar label.tray-ico.mic {
-  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-  font-size: 16px;
-  font-weight: 500;
-  min-width: 1em;
-  padding: 5px 6px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-window.bar image.tray-ico.vpn,
-window.bar image.tray-ico.bt {
-  color: rgba(255, 255, 255, 0.82);
-  padding: 5px 6px;
-}
-
-/* Tray: right inset + vertical padding so icons clear bar top/bottom */
+/* Tray: tight gap between items; vertical breathing room */
 window.bar .right {
   padding: 6px 10px 6px 0;
 }
 
-window.bar image.tray-ico.net {
-  color: rgba(255, 255, 255, 0.82);
-  padding: 5px 6px;
+/* Same cell for every control — icons align to one grid */
+window.bar .tray-slot {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 1px;
 }
 
-window.bar image.tray-ico.net.offline {
-  color: rgba(255, 255, 255, 0.82);
+/* One size + one color for all symbolic tray glyphs */
+window.bar image.tray-ico {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+window.bar image.tray-ico.offline {
+  color: rgba(255, 255, 255, 0.88);
 }

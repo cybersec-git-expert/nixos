@@ -5,9 +5,23 @@ import Bluetooth from 'resource:///com/github/Aylur/ags/service/bluetooth.js'
 import Network from 'resource:///com/github/Aylur/ags/service/network.js'
 import Utils from 'resource:///com/github/Aylur/ags/utils.js'
 
+/** All tray Gtk.Image icons use the same pixel size so they align visually. */
+const TRAY_ICON_PX = 16
+
 const time = Variable('', {
     poll: [1000, () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })],
 })
+
+/** Fixed-width cell so every tray control lines up the same. */
+/** @param {any} child */
+function TraySlot(child) {
+    return Widget.Box({
+        class_name: 'tray-slot',
+        valign: 'center',
+        halign: 'center',
+        child,
+    })
+}
 
 /** Map GDK monitor index → Hyprland monitor (by layout origin). */
 function hyprMonitorForGdk(gdkIdx) {
@@ -52,17 +66,19 @@ function windowTitle(gdkIdx) {
     )
 }
 
-function volumeGlyph() {
-    return Utils.merge(
-        [Audio.speaker.bind('volume'), Audio.speaker.bind('is_muted')],
-        (v, muted) => {
-            if (muted) return '󰝟'
-            const pct = Math.round((v ?? 0) * 100)
-            if (pct < 33) return ''
-            if (pct < 66) return ''
-            return '󰕾'
-        },
-    )
+/** @param {any} icon */
+function syncSpeakerSymbolic(icon) {
+    const sp = Audio.speaker
+    if (sp.is_muted) icon.icon = 'audio-volume-muted-symbolic'
+    else if ((sp.volume ?? 0) < 0.34) icon.icon = 'audio-volume-low-symbolic'
+    else if ((sp.volume ?? 0) < 0.67) icon.icon = 'audio-volume-medium-symbolic'
+    else icon.icon = 'audio-volume-high-symbolic'
+}
+
+/** @param {any} icon */
+function syncMicSymbolic(icon) {
+    const m = Audio.microphone
+    icon.icon = m.is_muted ? 'audio-input-microphone-muted-symbolic' : 'audio-input-microphone-symbolic'
 }
 
 const VOL_SCROLL_STEP = 0.05
@@ -77,8 +93,8 @@ function VpnTrayIcon() {
             Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
         child: Widget.Icon({
-            class_name: 'tray-ico vpn',
-            size: 20,
+            class_name: 'tray-ico',
+            size: TRAY_ICON_PX,
             icon: 'network-vpn-symbolic',
             setup: (self) => {
                 const sync = () => {
@@ -119,8 +135,8 @@ function BluetoothTrayIcon() {
             ]).catch(() => {})
         },
         child: Widget.Icon({
-            class_name: 'tray-ico bt',
-            size: 20,
+            class_name: 'tray-ico',
+            size: TRAY_ICON_PX,
             icon: 'bluetooth-disabled-symbolic',
             setup: (self) => {
                 const sync = () => {
@@ -145,13 +161,6 @@ function BluetoothTrayIcon() {
     })
 }
 
-function micGlyph() {
-    return Utils.merge(
-        [Audio.microphone.bind('volume'), Audio.microphone.bind('is_muted')],
-        (_v, muted) => (muted ? '󰍭' : '󰍬'),
-    )
-}
-
 function MicTray() {
     return Widget.EventBox({
         class_name: 'mic-tray',
@@ -170,9 +179,18 @@ function MicTray() {
             const m = Audio.microphone
             m.is_muted = !(m.is_muted ?? false)
         },
-        child: Widget.Label({
-            class_name: 'tray-ico mic',
-            label: micGlyph(),
+        child: Widget.Icon({
+            class_name: 'tray-ico',
+            size: TRAY_ICON_PX,
+            icon: 'audio-input-microphone-symbolic',
+            setup: (self) => {
+                const sync = () => {
+                    syncMicSymbolic(self)
+                    self.opacity = 1
+                }
+                self.hook(Audio, sync)
+                sync()
+            },
         }),
     })
 }
@@ -195,18 +213,27 @@ function VolumeTray() {
             const sp = Audio.speaker
             sp.is_muted = !(sp.is_muted ?? false)
         },
-        child: Widget.Label({
-            class_name: 'tray-ico vol',
-            label: volumeGlyph(),
+        child: Widget.Icon({
+            class_name: 'tray-ico',
+            size: TRAY_ICON_PX,
+            icon: 'audio-volume-medium-symbolic',
+            setup: (self) => {
+                const sync = () => {
+                    syncSpeakerSymbolic(self)
+                    self.opacity = 1
+                }
+                self.hook(Audio, sync)
+                sync()
+            },
         }),
     })
 }
 
-/** Monitor / “PC” look (freedesktop symbolic), not Wi‑Fi waves. */
+/** Monitor / PC (freedesktop symbolic). */
 function NetworkComputerIcon() {
     return Widget.Icon({
-        class_name: 'tray-ico net',
-        size: 20,
+        class_name: 'tray-ico',
+        size: TRAY_ICON_PX,
         icon: 'video-display-symbolic',
         setup: (self) => {
             const online = () => {
@@ -272,14 +299,14 @@ const Bar = (monitor) =>
             }),
             end_widget: Widget.Box({
                 class_name: 'right',
-                spacing: 14,
+                spacing: 4,
                 hpack: 'end',
                 children: [
-                    VpnTrayIcon(),
-                    BluetoothTrayIcon(),
-                    MicTray(),
-                    VolumeTray(),
-                    NetworkComputerIcon(),
+                    TraySlot(VpnTrayIcon()),
+                    TraySlot(BluetoothTrayIcon()),
+                    TraySlot(MicTray()),
+                    TraySlot(VolumeTray()),
+                    TraySlot(NetworkComputerIcon()),
                 ],
             }),
         }),
