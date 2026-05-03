@@ -494,3 +494,200 @@ window.qs-panel button.qs-settings-btn {
 window.qs-panel button.qs-settings-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* ---- Wi-Fi flyout (bar; nmcli) — same shell feel as Quick settings ---- */
+window.wifi-menu {
+  font-family:
+    "DM Sans",
+    "Plus Jakarta Sans",
+    Inter,
+    "Segoe UI Variable Text",
+    system-ui,
+    sans-serif;
+}
+
+window.wifi-menu .wifi-menu-shell {
+  min-width: 320px;
+  padding: 12px 14px 10px;
+  background-color: rgba(30, 30, 32, 0.98);
+  border-radius: 10px;
+  color: rgba(245, 245, 250, 0.96);
+}
+
+window.wifi-menu .wifi-menu-head {
+  margin-bottom: 8px;
+}
+
+window.wifi-menu button.wifi-menu-back {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  color: inherit;
+}
+
+window.wifi-menu button.wifi-menu-back:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+window.wifi-menu label.wifi-menu-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Gtk.Switch — clearer on/off than theme default */
+window.wifi-menu switch.wifi-menu-switch {
+  min-width: 48px;
+  min-height: 26px;
+  border-radius: 13px;
+  background-color: rgba(58, 60, 68, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+
+window.wifi-menu switch.wifi-menu-switch slider {
+  min-width: 22px;
+  min-height: 22px;
+  margin: 2px;
+  border-radius: 11px;
+  background-color: rgba(245, 246, 250, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+window.wifi-menu switch.wifi-menu-switch:active,
+window.wifi-menu switch.wifi-menu-switch:checked {
+  background-color: rgba(0, 120, 215, 0.95);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+window.wifi-menu switch.wifi-menu-switch:active slider,
+window.wifi-menu switch.wifi-menu-switch:checked slider {
+  background-color: rgba(252, 252, 255, 0.98);
+}
+
+window.wifi-menu .wifi-menu-scroll {
+  min-height: 120px;
+  margin-bottom: 6px;
+}
+
+window.wifi-menu .wifi-menu-row {
+  border-radius: 6px;
+}
+
+window.wifi-menu .wifi-menu-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+window.wifi-menu .wifi-menu-row-sel {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+window.wifi-menu .wifi-menu-row-active label.wifi-menu-ssid {
+  color: rgba(130, 200, 255, 0.95);
+}
+
+window.wifi-menu .wifi-menu-row-inner {
+  padding: 8px 6px;
+}
+
+window.wifi-menu .wifi-menu-sel-spacer {
+  min-width: 3px;
+}
+
+window.wifi-menu .wifi-menu-sel-bar {
+  min-width: 3px;
+  border-radius: 2px;
+  background-color: rgba(0, 120, 215, 0.96);
+}
+
+window.wifi-menu label.wifi-menu-ssid {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+window.wifi-menu label.wifi-menu-hint {
+  font-size: 12px;
+  color: rgba(200, 208, 230, 0.85);
+  padding: 16px 8px;
+}
+
+window.wifi-menu label.wifi-menu-err {
+  font-size: 12px;
+  color: rgba(255, 140, 140, 0.95);
+  margin-bottom: 6px;
+}
+
+window.wifi-menu .wifi-menu-details {
+  padding: 8px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+}
+
+window.wifi-menu label.wifi-menu-sub {
+  font-size: 12px;
+  color: rgba(190, 198, 220, 0.88);
+}
+
+window.wifi-menu entry.wifi-menu-entry {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(245, 245, 250, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+window.wifi-menu button.wifi-menu-eye {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+window.wifi-menu button.wifi-menu-eye:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+window.wifi-menu .wifi-menu-actions {
+  margin-top: 4px;
+}
+
+window.wifi-menu button.wifi-menu-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+window.wifi-menu button.wifi-menu-btn-primary {
+  background: rgba(0, 120, 215, 0.96);
+  color: rgba(16, 28, 40, 0.95);
+}
+
+window.wifi-menu button.wifi-menu-btn-primary:hover {
+  background: rgba(30, 145, 235, 0.98);
+}
+
+window.wifi-menu button.wifi-menu-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 245, 250, 0.92);
+}
+
+window.wifi-menu button.wifi-menu-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+window.wifi-menu button.wifi-menu-more {
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  margin-top: 2px;
+  color: rgba(120, 180, 255, 0.95);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+window.wifi-menu button.wifi-menu-more:hover {
+  color: rgba(160, 200, 255, 1);
+}

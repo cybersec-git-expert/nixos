@@ -1,4 +1,5 @@
 import Gdk from 'gi://Gdk'
+import GLib from 'gi://GLib'
 import Hyprland from 'resource:///com/github/Aylur/ags/service/hyprland.js'
 import Audio from 'resource:///com/github/Aylur/ags/service/audio.js'
 import Bluetooth from 'resource:///com/github/Aylur/ags/service/bluetooth.js'
@@ -177,9 +178,14 @@ function quickSettingsName(/** @type {number} */ m) {
     return `quickSettings${m}`
 }
 
+function wifiMenuName(/** @type {number} */ m) {
+    return `wifiMenu${m}`
+}
+
 function closeAllMonitorOverlays(/** @type {number} */ m) {
     App.closeWindow(trayFlyoutName(m))
     App.closeWindow(quickSettingsName(m))
+    App.closeWindow(wifiMenuName(m))
     App.closeWindow(flyoutScrimName(m))
 }
 
@@ -201,6 +207,432 @@ function toggleQuickSettings(/** @type {number} */ m) {
     closeAllMonitorOverlays(m)
     App.openWindow(flyoutScrimName(m))
     App.openWindow(quickSettingsName(m))
+}
+
+function toggleWifiMenu(/** @type {number} */ m) {
+    if (App.getWindow(wifiMenuName(m))?.visible) {
+        closeAllMonitorOverlays(m)
+        return
+    }
+    closeAllMonitorOverlays(m)
+    try {
+        Network.wifi?.scan?.()
+    } catch {
+        /* ignore */
+    }
+    App.openWindow(flyoutScrimName(m))
+    App.openWindow(wifiMenuName(m))
+}
+
+/** @returns {Map<string, boolean>} SSID → needs password */
+function nmWifiSecurityMap() {
+    const m = new Map()
+    const parseTab = (out) => {
+        for (const line of String(out).trim().split('\n')) {
+            if (!line) continue
+            const ix = line.indexOf('\t')
+            if (ix === -1) continue
+            const ssid = line.slice(0, ix)
+            const sec = line.slice(ix + 1).trim()
+            m.set(ssid, sec !== '--' && sec !== '')
+        }
+    }
+    const parseColon = (out) => {
+        for (const line of String(out).trim().split('\n')) {
+            if (!line) continue
+            const ix = line.lastIndexOf(':')
+            if (ix <= 0) continue
+            const ssid = line.slice(0, ix)
+            const sec = line.slice(ix + 1).trim()
+            m.set(ssid, sec !== '--' && sec !== '')
+        }
+    }
+    try {
+        parseTab(Utils.exec(['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SECURITY', 'dev', 'wifi']) || '')
+        return m
+    } catch {
+        m.clear()
+        try {
+            parseColon(Utils.exec(['nmcli', '-t', '-f', 'SSID,SECURITY', 'dev', 'wifi']) || '')
+        } catch {
+            /* ignore */
+        }
+        return m
+    }
+}
+
+function wifiDedupedAps() {
+    const w = Network.wifi
+    if (!w?.access_points) return []
+    /** @type {Map<string, any>} */
+    const best = new Map()
+    for (const ap of w.access_points) {
+        const ssid = ap.ssid
+        if (!ssid) continue
+        const prev = best.get(ssid)
+        if (!prev || ap.strength > prev.strength) best.set(ssid, ap)
+    }
+    return [...best.values()].sort((a, b) => b.strength - a.strength)
+}
+
+function apIconSuggestsOpen(/** @type {any} */ ap) {
+    const n = (ap.iconName || '').toLowerCase()
+    return n.includes('open') || n.includes('unencrypt') || n.includes('unsecure')
+}
+
+/** Win11-style Wi-Fi list (nmcli connect). */
+function WifiMenuPanel(/** @type {number} */ monitor) {
+    /** @type {string | null} */
+    let selectedSsid = null
+
+    const errLbl = Widget.Label({
+        class_name: 'wifi-menu-err',
+        xalign: 0,
+        visible: false,
+        wrap: true,
+    })
+    const passwordEntry = Widget.Entry({
+        class_name: 'wifi-menu-entry',
+        placeholder_text: 'Network security key',
+        hexpand: true,
+        visibility: false,
+    })
+    const autoSw = Widget.Switch({ valign: 'center', active: true })
+
+    const listBin = Widget.Box({ vertical: true, class_name: 'wifi-menu-list' })
+
+    const details = Widget.Box({
+        class_name: 'wifi-menu-details',
+        vertical: true,
+        spacing: 8,
+        visible: false,
+    })
+
+    function securedFor(ssid) {
+        const secMap = nmWifiSecurityMap()
+        if (secMap.has(ssid)) return !!secMap.get(ssid)
+        const ap = wifiDedupedAps().find((a) => a.ssid === ssid)
+        if (!ap) return true
+        return !apIconSuggestsOpen(ap)
+    }
+
+    function applyDetails() {
+        if (!selectedSsid) {
+            details.visible = false
+            details.children = []
+            return
+        }
+        const secured = securedFor(selectedSsid)
+        details.visible = true
+        details.children = [
+            Widget.Label({
+                class_name: 'wifi-menu-sub',
+                xalign: 0,
+                label: secured ? 'Secured' : 'Open',
+            }),
+            ...(secured
+                ? [
+                      Widget.Box({
+                          class_name: 'wifi-menu-pwrow',
+                          spacing: 6,
+                          children: [
+                              passwordEntry,
+                              Widget.Button({
+                                  class_name: 'wifi-menu-eye',
+                                  cursor: 'pointer',
+                                  child: Widget.Icon({ icon: 'view-reveal-symbolic', size: 18 }),
+                                  on_clicked: (btn) => {
+                                      passwordEntry.visibility = !passwordEntry.visibility
+                                      btn.child.icon = passwordEntry.visibility
+                                          ? 'view-conceal-symbolic'
+                                          : 'view-reveal-symbolic'
+                                  },
+                              }),
+                          ],
+                      }),
+                  ]
+                : []),
+            Widget.Box({
+                class_name: 'wifi-menu-auto',
+                spacing: 8,
+                valign: 'center',
+                children: [
+                    autoSw,
+                    Widget.Label({
+                        class_name: 'wifi-menu-sub',
+                        xalign: 0,
+                        label: 'Connect automatically',
+                    }),
+                ],
+            }),
+            Widget.Box({
+                class_name: 'wifi-menu-actions',
+                spacing: 8,
+                children: [
+                    Widget.Button({
+                        class_name: 'wifi-menu-btn wifi-menu-btn-primary',
+                        cursor: 'pointer',
+                        hexpand: true,
+                        label: 'Connect',
+                        on_clicked: () => {
+                            if (!selectedSsid) return
+                            const sec = securedFor(selectedSsid)
+                            if (sec && !passwordEntry.text) {
+                                errLbl.label = 'Enter the network security key.'
+                                errLbl.visible = true
+                                return
+                            }
+                            errLbl.visible = false
+                            const args = ['nmcli', 'device', 'wifi', 'connect', selectedSsid]
+                            if (sec && passwordEntry.text) args.push('password', passwordEntry.text)
+                            Utils.execAsync(args)
+                                .then(() => {
+                                    closeAllMonitorOverlays(monitor)
+                                    try {
+                                        Network.wifi?.scan?.()
+                                    } catch {
+                                        /* ignore */
+                                    }
+                                })
+                                .catch(() => {
+                                    errLbl.label =
+                                        'Could not connect. Check the password and try again.'
+                                    errLbl.visible = true
+                                })
+                        },
+                    }),
+                    Widget.Button({
+                        class_name: 'wifi-menu-btn wifi-menu-btn-ghost',
+                        cursor: 'pointer',
+                        hexpand: true,
+                        label: 'Cancel',
+                        on_clicked: () => {
+                            selectedSsid = null
+                            passwordEntry.text = ''
+                            errLbl.visible = false
+                            rebuild()
+                        },
+                    }),
+                ],
+            }),
+        ]
+    }
+
+    function rebuildList() {
+        if (!Network.wifi?.enabled) {
+            listBin.children = [
+                Widget.Label({
+                    class_name: 'wifi-menu-hint',
+                    wrap: true,
+                    xalign: 0.5,
+                    label: 'Wi-Fi is off. Turn it on to see networks.',
+                }),
+            ]
+            return
+        }
+
+        const aps = wifiDedupedAps()
+        if (aps.length === 0) {
+            listBin.children = [
+                Widget.Label({
+                    class_name: 'wifi-menu-hint',
+                    wrap: true,
+                    xalign: 0.5,
+                    label: 'Looking for networks…\nIf nothing appears, try again in a few seconds.',
+                }),
+            ]
+        } else {
+            listBin.children = aps.map((ap) => {
+                const ssid = ap.ssid
+                const sel = selectedSsid === ssid
+                return Widget.EventBox({
+                    class_name: `wifi-menu-row${sel ? ' wifi-menu-row-sel' : ''}${ap.active ? ' wifi-menu-row-active' : ''}`,
+                    cursor: 'pointer',
+                    on_primary_click: () => {
+                        const next = sel ? null : ssid
+                        selectedSsid = next
+                        if (next) passwordEntry.text = ''
+                        errLbl.visible = false
+                        rebuild()
+                    },
+                    child: Widget.Box({
+                        class_name: 'wifi-menu-row-inner',
+                        spacing: 8,
+                        children: [
+                            Widget.Box({
+                                class_name: sel ? 'wifi-menu-sel-bar' : 'wifi-menu-sel-spacer',
+                            }),
+                            Widget.Icon({
+                                icon: ap.iconName || 'network-wireless-signal-good-symbolic',
+                                size: 20,
+                            }),
+                            Widget.Label({
+                                class_name: 'wifi-menu-ssid',
+                                hexpand: true,
+                                xalign: 0,
+                                truncate: 'end',
+                                label: ssid,
+                            }),
+                        ],
+                    }),
+                })
+            })
+        }
+    }
+
+    function rebuild() {
+        if (!Network.wifi?.enabled) {
+            rebuildList()
+            selectedSsid = null
+            errLbl.visible = false
+            details.visible = false
+            details.children = []
+            return
+        }
+        rebuildList()
+        if (selectedSsid && !wifiDedupedAps().some((a) => a.ssid === selectedSsid)) {
+            selectedSsid = null
+            passwordEntry.text = ''
+            errLbl.visible = false
+        }
+        applyDetails()
+    }
+
+    /** Avoid `notify::active` when syncing from Network (prevents NM / UI fighting). */
+    let wifiSwitchProgrammatic = false
+
+    /** @param {any} sw */
+    function pullWifiSwitch(sw) {
+        if (!Network.wifi) return
+        const want = !!Network.wifi.enabled
+        if (!!sw.active === want) return
+        wifiSwitchProgrammatic = true
+        sw.active = want
+        wifiSwitchProgrammatic = false
+    }
+
+    const wifiSw = Widget.Switch({
+        valign: 'center',
+        class_name: 'wifi-menu-switch',
+        setup: (sw) => {
+            sw.connect('notify::active', () => {
+                if (wifiSwitchProgrammatic || !Network.wifi) return
+                const want = !!sw.active
+                if (!!Network.wifi.enabled === want) return
+                Network.wifi.enabled = want
+                try {
+                    Network.wifi.scan?.()
+                } catch {
+                    /* ignore */
+                }
+                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    rebuildList()
+                    return GLib.SOURCE_REMOVE
+                })
+                if (want) {
+                    Utils.timeout(350, () => {
+                        try {
+                            Network.wifi?.scan?.()
+                        } catch {
+                            /* ignore */
+                        }
+                        rebuildList()
+                    })
+                    Utils.timeout(1200, () => {
+                        try {
+                            Network.wifi?.scan?.()
+                        } catch {
+                            /* ignore */
+                        }
+                        rebuildList()
+                    })
+                }
+            })
+        },
+    })
+
+    return Widget.Window({
+        monitor,
+        name: wifiMenuName(monitor),
+        class_name: 'wifi-menu',
+        anchor: ['top', 'right'],
+        exclusivity: 'normal',
+        layer: 'overlay',
+        margins: [BAR_CLEARANCE_PX, 16, 0, 0],
+        visible: false,
+        setup: (self) => {
+            self.hook(Network, () => {
+                pullWifiSwitch(wifiSw)
+                if (!Network.wifi?.enabled) {
+                    selectedSsid = null
+                    errLbl.visible = false
+                    rebuild()
+                    return
+                }
+                rebuildList()
+                if (wifiDedupedAps().length === 0) {
+                    try {
+                        Network.wifi.scan?.()
+                    } catch {
+                        /* ignore */
+                    }
+                }
+                if (selectedSsid && !wifiDedupedAps().some((a) => a.ssid === selectedSsid)) {
+                    selectedSsid = null
+                    passwordEntry.text = ''
+                    errLbl.visible = false
+                    applyDetails()
+                }
+            })
+            rebuild()
+            pullWifiSwitch(wifiSw)
+        },
+        child: Widget.Box({
+            vertical: true,
+            class_name: 'wifi-menu-shell',
+            children: [
+                Widget.Box({
+                    class_name: 'wifi-menu-head',
+                    valign: 'center',
+                    spacing: 8,
+                    children: [
+                        Widget.Button({
+                            class_name: 'wifi-menu-back',
+                            cursor: 'pointer',
+                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
+                            on_clicked: () => closeAllMonitorOverlays(monitor),
+                        }),
+                        Widget.Label({
+                            class_name: 'wifi-menu-title',
+                            hexpand: true,
+                            xalign: 0,
+                            label: 'Wi-Fi',
+                        }),
+                        wifiSw,
+                    ],
+                }),
+                Widget.Scrollable({
+                    class_name: 'wifi-menu-scroll',
+                    vscroll: 'always',
+                    hscroll: 'never',
+                    hexpand: true,
+                    css: 'min-height: 120px;',
+                    child: listBin,
+                }),
+                errLbl,
+                details,
+                Widget.Button({
+                    class_name: 'wifi-menu-more',
+                    cursor: 'pointer',
+                    halign: 'start',
+                    label: 'More Wi-Fi settings',
+                    on_clicked: () => {
+                        Utils.execAsync(['nm-connection-editor']).catch(() => {})
+                    },
+                }),
+            ],
+        }),
+    })
 }
 
 /** @param {any} n */
@@ -697,25 +1129,48 @@ function qsWin11SimpleTile(iconWidget, captionRoot, onMain, setupSync) {
 
 function QuickSettingsPanel(/** @type {number} */ monitor) {
     const netLabel = Widget.Label({ class_name: 'qs-tile-cap', xalign: 0.5, wrap: true, max_width_chars: 14 })
+    const ethernetLive =
+        () =>
+            Network.primary === 'wired' &&
+            !!Network.wired &&
+            Network.wired.internet === 'connected'
+
     const netTile = qsAdaptivePill(
         netLabel,
         () => {
-            if (Network.wifi) Network.toggleWifi()
-            else Utils.execAsync(['nm-connection-editor']).catch(() => {})
+            if (ethernetLive() && Network.wifi) {
+                Network.toggleWifi()
+                return
+            }
+            if (!Network.wifi) {
+                Utils.execAsync(['nm-connection-editor']).catch(() => {})
+                return
+            }
+            if (!Network.wifi.enabled) {
+                Network.wifi.enabled = true
+                try {
+                    Network.wifi.scan?.()
+                } catch {
+                    /* ignore */
+                }
+            }
+            toggleWifiMenu(monitor)
         },
         () => {
             Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
         (_outer, icoIn) => {
-            if (Network.primary === 'wifi' && Network.wifi) {
-                icoIn.icon = Network.wifi.icon_name || 'network-wireless-symbolic'
-                netLabel.label = Network.wifi.ssid || 'Wi-Fi'
-                return Network.wifi.enabled && Network.wifi.internet === 'connected'
-            }
-            if (Network.primary === 'wired' && Network.wired) {
+            if (ethernetLive()) {
                 icoIn.icon = 'video-display-symbolic'
                 netLabel.label = 'Ethernet'
-                return Network.wired.internet === 'connected'
+                return true
+            }
+            if (Network.wifi) {
+                const w = Network.wifi
+                icoIn.icon = w.icon_name || 'network-wireless-symbolic'
+                netLabel.label =
+                    w.enabled && w.internet === 'connected' && w.ssid ? w.ssid : 'Wi-Fi'
+                return w.enabled && w.internet === 'connected'
             }
             icoIn.icon = 'network-offline-symbolic'
             netLabel.label = 'Network'
@@ -1125,13 +1580,43 @@ function VolumeTray(/** @type {number} */ m) {
     })
 }
 
-/** Network tray — opens Quick settings (bar styling unchanged). */
+/** True when the default route looks connected (wired or Wi-Fi). */
+function networkHasInternet() {
+    if (Network.primary === 'wired') return Network.wired?.internet === 'connected'
+    if (Network.primary === 'wifi' && Network.wifi) {
+        const w = Network.wifi
+        return (
+            !!w.enabled &&
+            w.internet === 'connected' &&
+            Network.connectivity !== 'none'
+        )
+    }
+    return false
+}
+
+/** Network tray — Quick settings when online; Wi-Fi menu when offline (if Wi-Fi exists). */
 function NetworkTrayIcon(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'net-tray',
         cursor: 'pointer',
-        tooltip_text: 'Network · Click: Quick settings · Right-click: connections',
-        on_primary_click: () => toggleQuickSettings(m),
+        setup: (self) => {
+            const tip = () => {
+                if (networkHasInternet()) {
+                    self.tooltip_text = 'Network · Click: Quick settings · Right-click: connection editor'
+                } else if (Network.wifi) {
+                    self.tooltip_text = 'Network · Click: Wi-Fi · Right-click: connection editor'
+                } else {
+                    self.tooltip_text = 'Network · Click: Quick settings · Right-click: connection editor'
+                }
+            }
+            self.hook(Network, tip)
+            tip()
+        },
+        on_primary_click: () => {
+            if (networkHasInternet()) toggleQuickSettings(m)
+            else if (Network.wifi) toggleWifiMenu(m)
+            else toggleQuickSettings(m)
+        },
         on_secondary_click: () => {
             Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
@@ -1140,20 +1625,8 @@ function NetworkTrayIcon(/** @type {number} */ m) {
             size: TRAY_ICON_PX,
             icon: 'video-display-symbolic',
             setup: (self) => {
-                const online = () => {
-                    if (Network.primary === 'wired') return Network.wired?.internet === 'connected'
-                    if (Network.primary === 'wifi' && Network.wifi) {
-                        const w = Network.wifi
-                        return (
-                            !!w.enabled &&
-                            w.internet === 'connected' &&
-                            Network.connectivity !== 'none'
-                        )
-                    }
-                    return false
-                }
                 const sync = () => {
-                    const on = online()
+                    const on = networkHasInternet()
                     self.opacity = on ? 1 : 0.45
                     self.toggleClassName('offline', !on)
                 }
@@ -1239,9 +1712,10 @@ const Bar = (monitor) =>
 const bars = [...Array(nMon).keys()].map((i) => Bar(i))
 const flyoutScrims = [...Array(nMon).keys()].map((i) => FlyoutScrim(i))
 const quickSettingsWins = [...Array(nMon).keys()].map((i) => QuickSettingsPanel(i))
+const wifiMenuWins = [...Array(nMon).keys()].map((i) => WifiMenuPanel(i))
 const trayFlyouts = [...Array(nMon).keys()].map((i) => TrayFlyout(i))
 
 App.config({
     style: `${App.configDir}/style.css`,
-    windows: [...bars, ...flyoutScrims, ...quickSettingsWins, ...trayFlyouts],
+    windows: [...bars, ...flyoutScrims, ...quickSettingsWins, ...wifiMenuWins, ...trayFlyouts],
 })
