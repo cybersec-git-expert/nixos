@@ -26,6 +26,16 @@ const dateLong = Variable('', {
     ],
 })
 
+/** Calendar outer width (min-width + horizontal padding) so notifications sit left of the calendar. */
+const CAL_OUTER_W = 322
+const FLYOUT_GAP = 12
+
+/** @param {any} cal */
+function monthYearFromCal(cal) {
+    const [y, mo] = cal.date
+    return new Date(y, mo, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
 /** Fixed-width cell so every tray control lines up the same. */
 /** @param {any} child */
 function TraySlot(child) {
@@ -85,8 +95,25 @@ function WorkspacePills(gdkIdx) {
     })
 }
 
-function notificationCenterName(/** @type {number} */ m) {
-    return `notificationCenter${m}`
+function notificationFlyoutName(/** @type {number} */ m) {
+    return `notifFlyout${m}`
+}
+
+function calendarFlyoutName(/** @type {number} */ m) {
+    return `calFlyout${m}`
+}
+
+/** @param {number} m @param {boolean} open */
+function setFlyoutsOpen(m, open) {
+    const nn = notificationFlyoutName(m)
+    const cn = calendarFlyoutName(m)
+    if (open) {
+        App.openWindow(nn)
+        App.openWindow(cn)
+    } else {
+        App.closeWindow(nn)
+        App.closeWindow(cn)
+    }
 }
 
 /** @param {any} n */
@@ -187,16 +214,16 @@ function NotificationList() {
     })
 }
 
-/** @param {number} monitor Gdk index — panel anchors top-right on that output. */
-function NotificationCenterPanel(monitor) {
+/** @param {number} monitor Gdk index — notifications only; calendar is a separate window. */
+function NotificationFlyout(monitor) {
     return Widget.Window({
         monitor,
-        name: notificationCenterName(monitor),
-        class_name: 'nc-panel',
+        name: notificationFlyoutName(monitor),
+        class_name: 'nf-panel',
         anchor: ['top', 'right'],
         exclusivity: 'normal',
         layer: 'overlay',
-        margins: [52, 16, 0, 0],
+        margins: [52, 16 + CAL_OUTER_W + FLYOUT_GAP, 0, 0],
         visible: false,
         child: Widget.Box({
             vertical: true,
@@ -228,15 +255,91 @@ function NotificationCenterPanel(monitor) {
                     css: 'min-height: 140px;',
                     child: NotificationList(),
                 }),
-                Widget.Separator({ class_name: 'nc-sep' }),
-                Widget.Label({
-                    class_name: 'nc-date',
-                    xalign: 0,
-                    label: dateLong.bind(),
+            ],
+        }),
+    })
+}
+
+/** @param {number} monitor Gdk index — minimal calendar card at the screen edge (notifications to its left). */
+function CalendarFlyout(monitor) {
+    const calWidget = Widget.Calendar({
+        class_name: 'cal-grid',
+        show_heading: false,
+        show_day_names: true,
+        show_week_numbers: false,
+    })
+    const monthLbl = Widget.Label({ class_name: 'cal-month', hexpand: true, xalign: 0.5 })
+    const syncMonth = () => {
+        monthLbl.label = monthYearFromCal(calWidget)
+    }
+    const bump = (/** @type {number} */ delta) => {
+        const [y, mo] = calWidget.date
+        let nm = mo + delta
+        let ny = y
+        while (nm < 0) {
+            nm += 12
+            ny -= 1
+        }
+        while (nm > 11) {
+            nm -= 12
+            ny += 1
+        }
+        calWidget.select_month(nm, ny)
+        syncMonth()
+    }
+    syncMonth()
+    calWidget.connect('day-selected', syncMonth)
+    calWidget.connect('prev-month', syncMonth)
+    calWidget.connect('next-month', syncMonth)
+
+    return Widget.Window({
+        monitor,
+        name: calendarFlyoutName(monitor),
+        class_name: 'cal-flyout',
+        anchor: ['top', 'right'],
+        exclusivity: 'normal',
+        layer: 'overlay',
+        margins: [52, 16, 0, 0],
+        visible: false,
+        child: Widget.Box({
+            vertical: true,
+            class_name: 'cal-inner',
+            children: [
+                Widget.Box({
+                    class_name: 'cal-date-row',
+                    valign: 'center',
+                    children: [
+                        Widget.Label({
+                            class_name: 'cal-date-main',
+                            hexpand: true,
+                            xalign: 0,
+                            wrap: true,
+                            label: dateLong.bind(),
+                        }),
+                        Widget.Icon({ class_name: 'cal-chev', icon: 'pan-down-symbolic', size: 14 }),
+                    ],
                 }),
-                Widget.Calendar({
-                    class_name: 'nc-calendar',
+                Widget.Box({
+                    class_name: 'cal-nav',
+                    valign: 'center',
+                    spacing: 4,
+                    children: [
+                        Widget.Button({
+                            class_name: 'cal-nav-btn',
+                            cursor: 'pointer',
+                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 14 }),
+                            on_clicked: () => bump(-1),
+                        }),
+                        monthLbl,
+                        Widget.Button({
+                            class_name: 'cal-nav-btn',
+                            cursor: 'pointer',
+                            child: Widget.Icon({ icon: 'go-next-symbolic', size: 14 }),
+                            on_clicked: () => bump(1),
+                        }),
+                    ],
                 }),
+                calWidget,
             ],
         }),
     })
@@ -263,15 +366,16 @@ function ClockBlock() {
     })
 }
 
-/** Opens the notification+calendar panel for this bar’s monitor (right of volume). */
+/** Opens the notification and calendar flyouts together (right of volume). */
 function NotificationTrayButton(/** @type {number} */ gdkMonitor) {
-    const wname = notificationCenterName(gdkMonitor)
     return Widget.EventBox({
         class_name: 'notif-tray',
         cursor: 'pointer',
         tooltip_text: 'Notifications & calendar',
         on_primary_click: () => {
-            App.toggleWindow(wname)
+            const wn = App.getWindow(notificationFlyoutName(gdkMonitor))
+            const open = !(wn?.visible ?? false)
+            setFlyoutsOpen(gdkMonitor, open)
         },
         child: Widget.Label({
             class_name: 'tray-ico tray-bell',
@@ -552,9 +656,10 @@ const Bar = (monitor) =>
     })
 
 const bars = [...Array(nMon).keys()].map((i) => Bar(i))
-const panels = [...Array(nMon).keys()].map((i) => NotificationCenterPanel(i))
+const notifFlyouts = [...Array(nMon).keys()].map((i) => NotificationFlyout(i))
+const calFlyouts = [...Array(nMon).keys()].map((i) => CalendarFlyout(i))
 
 App.config({
     style: `${App.configDir}/style.css`,
-    windows: [...bars, ...panels],
+    windows: [...bars, ...notifFlyouts, ...calFlyouts],
 })
