@@ -263,10 +263,17 @@ function nmWifiSecurityMap() {
 
 function wifiDedupedAps() {
     const w = Network.wifi
-    if (!w?.access_points) return []
+    if (!w) return []
+    let raw
+    try {
+        raw = w.access_points
+    } catch {
+        return []
+    }
+    if (!raw?.length) return []
     /** @type {Map<string, any>} */
     const best = new Map()
-    for (const ap of w.access_points) {
+    for (const ap of raw) {
         const ssid = ap.ssid
         if (!ssid) continue
         const prev = best.get(ssid)
