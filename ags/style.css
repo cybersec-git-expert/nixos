@@ -535,7 +535,7 @@ window.wifi-menu label.wifi-menu-title {
   font-weight: 700;
 }
 
-/* Gtk.Switch — clearer on/off than theme default */
+/* Gtk.Switch — same “active” blue as Quick settings tiles (qs-tile-active) */
 window.wifi-menu switch.wifi-menu-switch {
   min-width: 48px;
   min-height: 26px;
@@ -543,6 +543,8 @@ window.wifi-menu switch.wifi-menu-switch {
   background-color: rgba(58, 60, 68, 0.98);
   border: 1px solid rgba(0, 0, 0, 0.45);
   outline: none;
+  -gtk-outline-radius: 0;
+  outline-offset: 0;
 }
 
 window.wifi-menu switch.wifi-menu-switch slider {
@@ -552,15 +554,23 @@ window.wifi-menu switch.wifi-menu-switch slider {
   border-radius: 11px;
   background-color: rgba(245, 246, 250, 0.98);
   border: 1px solid rgba(0, 0, 0, 0.35);
+  outline: none;
+  -gtk-outline-radius: 0;
+}
+
+window.wifi-menu switch.wifi-menu-switch:focus,
+window.wifi-menu switch.wifi-menu-switch slider:focus {
+  outline: none;
 }
 
 window.wifi-menu switch.wifi-menu-switch:active {
-  background-color: rgba(0, 120, 215, 0.95);
-  border-color: rgba(0, 0, 0, 0.25);
+  background-color: rgba(0, 120, 215, 0.96);
+  border-color: rgba(0, 0, 0, 0.22);
 }
 
 window.wifi-menu switch.wifi-menu-switch:active slider {
-  background-color: rgba(252, 252, 255, 0.98);
+  background-color: rgba(248, 250, 255, 0.98);
+  border-color: rgba(16, 28, 40, 0.22);
 }
 
 window.wifi-menu .wifi-menu-scroll {

@@ -220,6 +220,15 @@ function toggleWifiMenu(/** @type {number} */ m) {
     } catch {
         /* ignore */
     }
+    try {
+        Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
+    } catch {
+        try {
+            Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
+        } catch {
+            /* ignore */
+        }
+    }
     App.openWindow(flyoutScrimName(m))
     App.openWindow(wifiMenuName(m))
 }
@@ -285,6 +294,143 @@ function wifiDedupedAps() {
 function apIconSuggestsOpen(/** @type {any} */ ap) {
     const n = (ap.iconName || '').toLowerCase()
     return n.includes('open') || n.includes('unencrypt') || n.includes('unsecure')
+}
+
+function nmcliSignalIcon(/** @type {number} */ strength) {
+    const s = Number(strength) || 0
+    if (s >= 67) return 'network-wireless-signal-excellent-symbolic'
+    if (s >= 34) return 'network-wireless-signal-good-symbolic'
+    if (s > 0) return 'network-wireless-signal-ok-symbolic'
+    return 'network-wireless-signal-none-symbolic'
+}
+
+/**
+ * SSIDs from nmcli (several argv shapes — NM versions differ).
+ * @returns {{ ssid: string, strength: number, active: boolean, secured: boolean, iconName: string }[]}
+ */
+function nmcliWifiRowsParsed() {
+    /** @type {string[][]} */
+    const attempts = [
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY,IN-USE', 'device', 'wifi', 'list'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY,ACTIVE', 'device', 'wifi', 'list'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'dev', 'wifi', 'list'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL', 'device', 'wifi', 'list'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'device', 'wifi'],
+        ['nmcli', '-m', 'tab', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'dev', 'wifi'],
+    ]
+    let out = ''
+    for (const cmd of attempts) {
+        try {
+            const o = Utils.exec(cmd) || ''
+            const t = String(o).trim()
+            if (t.length > 0 && !/^error\b/i.test(t)) {
+                out = t
+                break
+            }
+        } catch {
+            /* try next */
+        }
+    }
+    if (!out) return []
+
+    let cur = null
+    try {
+        if (Network.wifi?.internet === 'connected' && Network.wifi?.ssid) {
+            cur = String(Network.wifi.ssid)
+        }
+    } catch {
+        cur = null
+    }
+    const secMap = nmWifiSecurityMap()
+    const seen = new Set()
+    /** @type {{ ssid: string, strength: number, active: boolean, secured: boolean, iconName: string }[]} */
+    const rows = []
+    for (const line of out.split('\n')) {
+        if (!line) continue
+        const p = line.split('\t')
+        if (p.length < 2) continue
+        const ssid = (p[0] || '').trim()
+        if (!ssid || ssid === '--' || seen.has(ssid)) continue
+        seen.add(ssid)
+        const signal = parseInt(p[1], 10)
+        const security = p.length >= 3 ? (p[2] || '').trim() : ''
+        const useFlag = p.length >= 4 ? (p[3] || '').trim() : ''
+        const inUse =
+            useFlag === '*' ||
+            useFlag.toLowerCase() === 'yes' ||
+            (cur != null && ssid === cur)
+        let secured
+        if (p.length >= 3) {
+            secured = security !== '' && security !== '--'
+        } else if (secMap.has(ssid)) {
+            secured = !!secMap.get(ssid)
+        } else {
+            secured = true
+        }
+        rows.push({
+            ssid,
+            strength: Number.isFinite(signal) ? signal : 0,
+            active: inUse,
+            secured,
+            iconName: nmcliSignalIcon(signal),
+        })
+    }
+    rows.sort((a, b) => b.strength - a.strength)
+    return rows
+}
+
+/** @param {any[]} ags */
+function wifiRowsFromAgs(ags) {
+    const secMap = nmWifiSecurityMap()
+    return ags.map((ap) => {
+        let secured = secMap.get(ap.ssid)
+        if (secured === undefined) secured = !apIconSuggestsOpen(ap)
+        return {
+            ssid: ap.ssid,
+            strength: ap.strength ?? 0,
+            active: !!ap.active,
+            secured: !!secured,
+            iconName: ap.iconName || nmcliSignalIcon(ap.strength ?? 0),
+        }
+    })
+}
+
+/**
+ * Union of AGS + nmcli rows (AGS often omits APs; nmcli is the reliable list on many setups).
+ */
+function wifiRowsForMenu() {
+    if (!Network.wifi?.enabled) return []
+
+    const fromAgs = wifiRowsFromAgs(wifiDedupedAps())
+    let fromNm = []
+    try {
+        fromNm = nmcliWifiRowsParsed()
+    } catch {
+        fromNm = []
+    }
+
+    /** @type {Map<string, { ssid: string, strength: number, active: boolean, secured: boolean, iconName: string }>} */
+    const best = new Map()
+    for (const r of [...fromAgs, ...fromNm]) {
+        const prev = best.get(r.ssid)
+        if (!prev) {
+            best.set(r.ssid, { ...r })
+            continue
+        }
+        const pick =
+            r.strength > prev.strength ||
+            (r.strength === prev.strength && r.active && !prev.active)
+        if (pick) {
+            best.set(r.ssid, {
+                ...r,
+                active: r.active || prev.active,
+            })
+        } else if (r.active && !prev.active) {
+            best.set(r.ssid, { ...prev, active: true })
+        }
+    }
+    return [...best.values()].sort((a, b) => b.strength - a.strength)
 }
 
 /** Win11-style Wi-Fi list (nmcli connect). */
@@ -438,8 +584,8 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
             return
         }
 
-        const aps = wifiDedupedAps()
-        if (aps.length === 0) {
+        const rows = wifiRowsForMenu()
+        if (rows.length === 0) {
             listBin.children = [
                 Widget.Label({
                     class_name: 'wifi-menu-hint',
@@ -449,11 +595,11 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
                 }),
             ]
         } else {
-            listBin.children = aps.map((ap) => {
-                const ssid = ap.ssid
+            listBin.children = rows.map((row) => {
+                const ssid = row.ssid
                 const sel = selectedSsid === ssid
                 return Widget.EventBox({
-                    class_name: `wifi-menu-row${sel ? ' wifi-menu-row-sel' : ''}${ap.active ? ' wifi-menu-row-active' : ''}`,
+                    class_name: `wifi-menu-row${sel ? ' wifi-menu-row-sel' : ''}${row.active ? ' wifi-menu-row-active' : ''}`,
                     cursor: 'pointer',
                     on_primary_click: () => {
                         const next = sel ? null : ssid
@@ -470,7 +616,7 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
                                 class_name: sel ? 'wifi-menu-sel-bar' : 'wifi-menu-sel-spacer',
                             }),
                             Widget.Icon({
-                                icon: ap.iconName || 'network-wireless-signal-good-symbolic',
+                                icon: row.iconName || 'network-wireless-signal-good-symbolic',
                                 size: 20,
                             }),
                             Widget.Label({
@@ -497,7 +643,7 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
             return
         }
         rebuildList()
-        if (selectedSsid && !wifiDedupedAps().some((a) => a.ssid === selectedSsid)) {
+        if (selectedSsid && !wifiRowsForMenu().some((r) => r.ssid === selectedSsid)) {
             selectedSsid = null
             passwordEntry.text = ''
             errLbl.visible = false
@@ -543,6 +689,15 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
                         } catch {
                             /* ignore */
                         }
+                        try {
+                            Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
+                        } catch {
+                            try {
+                                Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
+                            } catch {
+                                /* ignore */
+                            }
+                        }
                         rebuildList()
                     })
                     Utils.timeout(1200, () => {
@@ -577,14 +732,23 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
                     return
                 }
                 rebuildList()
-                if (wifiDedupedAps().length === 0) {
+                if (wifiRowsForMenu().length === 0) {
                     try {
                         Network.wifi.scan?.()
                     } catch {
                         /* ignore */
                     }
+                    try {
+                        Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
+                    } catch {
+                        try {
+                            Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
+                        } catch {
+                            /* ignore */
+                        }
+                    }
                 }
-                if (selectedSsid && !wifiDedupedAps().some((a) => a.ssid === selectedSsid)) {
+                if (selectedSsid && !wifiRowsForMenu().some((r) => r.ssid === selectedSsid)) {
                     selectedSsid = null
                     passwordEntry.text = ''
                     errLbl.visible = false
@@ -1164,7 +1328,8 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
             toggleWifiMenu(monitor)
         },
         () => {
-            Utils.execAsync(['nm-connection-editor']).catch(() => {})
+            if (Network.wifi) toggleWifiMenu(monitor)
+            else Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
         (_outer, icoIn) => {
             if (ethernetLive()) {
