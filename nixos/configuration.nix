@@ -294,6 +294,38 @@ in
   services.udisks2.enable = true;
   services.gvfs.enable = true;
 
+  # USB UPS: UPower only sees kernel `power_supply` devices. Prolink/Cypress (0665:5161) is usually
+  # a Qx/Megatec USB device — same as on Arch when people use **NUT** (`upsc`), not raw UPower.
+  services.upower.enable = true;
+  power.ups = {
+    enable = true;
+    mode = "standalone";
+    ups.prolink = {
+      driver = "nutdrv_qx";
+      port = "auto";
+      description = "Prolink USB (0665:5161)";
+      summary = pkgs.lib.mkForce ''
+        [prolink]
+        driver = nutdrv_qx
+        port = auto
+        desc = "Prolink USB (0665:5161)"
+        vendorid = 0665
+        productid = 5161
+        sdorder = 0
+      '';
+    };
+    users.admin = {
+      passwordFile = "/home/cyberexpert/.config/nixos/secrets/nut.password";
+      upsmon = "primary";
+      instcmds = [ "ALL" ];
+    };
+    upsmon.monitor.local = {
+      system = "prolink@localhost";
+      user = "admin";
+      passwordFile = "/home/cyberexpert/.config/nixos/secrets/nut.password";
+    };
+  };
+
   # Jackett — qBittorrent “Jackett” search plugin needs a real API key in
   # ~/.local/share/qBittorrent/nova3/engines/jackett.json (replace YOUR_API_KEY_HERE).
   # After `nixos-rebuild switch`: `sudo systemctl start jackett`, open http://127.0.0.1:9117 ,
@@ -333,6 +365,7 @@ in
     # Matugen (theming) + AGS bar + media/deps
     matugen imagemagick mpvpaper pulseaudio dunst libnotify cryptsetup gptfdisk
     inotify-tools pamixer swayosd udiskie cliphist socat jq
+    upower usbutils
     python3 dbus playerctl mpd mpc ncmpcpp cava
     python3Packages.pip
     pipx

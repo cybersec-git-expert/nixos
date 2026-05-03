@@ -312,6 +312,15 @@ window.qs-panel .qs-shell {
   color: rgba(245, 245, 250, 0.96);
 }
 
+/* Equal height for both quick-settings tile rows (adaptive pills vs simple tiles). */
+window.qs-panel .qs-grid .qs-row {
+  min-height: 118px;
+}
+
+window.qs-panel .qs-grid .qs-tile-outer {
+  min-height: 118px;
+}
+
 window.qs-panel .qs-tile-outer {
   min-width: 0;
   border-radius: 8px;
@@ -330,6 +339,16 @@ window.qs-panel .qs-tile-outer:not(.qs-tile-active):hover {
 window.qs-panel .qs-tile-outer.qs-tile-active {
   background-color: rgba(0, 120, 215, 0.96);
   color: rgba(16, 28, 40, 0.95);
+}
+
+/* UPS on utility power: blue active. On battery: amber so loss of mains is obvious. */
+window.qs-panel .qs-tile-outer.qs-tile-ups.qs-tile-ups-batt.qs-tile-active {
+  background-color: rgba(200, 110, 0, 0.95);
+  color: rgba(24, 18, 8, 0.96);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-ups.qs-tile-ups-batt.qs-tile-active button.qs-tile-simple:hover {
+  background-color: rgba(0, 0, 0, 0.12);
 }
 
 window.qs-panel .qs-tile-split {

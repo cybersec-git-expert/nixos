@@ -67,22 +67,193 @@ const nightLightActive = Variable(false, {
     ],
 })
 
-const upsSummary = Variable('', {
+/** Pick a UPower UPS/HID-battery path — device paths are usually `battery_hid_…`, not the word "ups". */
+function upowerUpsPath() {
+    let list = ''
+    try {
+        list = Utils.exec(['upower', '-e']) || ''
+    } catch {
+        return ''
+    }
+    for (const raw of list.trim().split('\n')) {
+        const path = raw.trim()
+        if (!path || path.includes('DisplayDevice')) continue
+        let info = ''
+        try {
+            info = Utils.exec(['upower', '-i', path]) || ''
+        } catch {
+            continue
+        }
+        const hay = `${path}\n${info}`.toLowerCase()
+        const upsLike =
+            hay.includes('ups') ||
+            hay.includes('prolink') ||
+            hay.includes('megatec') ||
+            hay.includes('uninterruptible') ||
+            hay.includes('hid-uninterruptible') ||
+            (hay.includes('battery_hid') && /ups|uninterrupt|megatec|prolink/i.test(info))
+        if (!upsLike) continue
+        return path
+    }
+    return ''
+}
+
+const UPS_STATUS_EMPTY = '{"connected":false}'
+
+/** NUT ups name@host — match `power.ups.ups` in NixOS (default here: prolink@localhost). */
+function nutUpsAddr() {
+    return GLib.getenv('NUT_UPS') || 'prolink@localhost'
+}
+
+/** @returns {{ pct: number|null, state: string, onBattery: boolean, timeToEmpty: string }} */
+function parseUpsNutUpsc(text) {
+    const m = {}
+    for (const line of String(text).split('\n')) {
+        const i = line.indexOf(':')
+        if (i === -1) continue
+        m[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+    }
+    const charge = m['battery.charge']
+    let pct = null
+    const chM = charge != null ? String(charge).match(/^(\d+)/) : null
+    if (chM) pct = parseInt(chM[1], 10)
+    const st = String(m['ups.status'] || '')
+    const onBattery = /\bob\b/i.test(st) || /\bdischrg\b/i.test(st) || /\blowbatt\b/i.test(st)
+    let timeToEmpty = ''
+    const rt = m['battery.runtime']
+    if (rt && /^\d+/.test(rt)) timeToEmpty = `${Math.round(parseInt(rt, 10) / 60)} min`
+    return { pct, state: st.toLowerCase(), onBattery, timeToEmpty }
+}
+
+/** @returns {{ pct: number|null, state: string, onBattery: boolean, timeToEmpty: string }} */
+function parseUpsUpowerInfo(info) {
+    const s = String(info)
+    const pctM = s.match(/percentage:\s*(\d+)/i)
+    const pct = pctM ? parseInt(pctM[1], 10) : null
+    const stateM = s.match(/state:\s*([^\n]+)/i)
+    const state = stateM ? stateM[1].trim().toLowerCase() : ''
+    let onBattery = /discharg|pending-discharge|empty/.test(state)
+    const onlineM = s.match(/online:\s*(\S+)/i)
+    if (onlineM) onBattery = /^(no|false)$/i.test(onlineM[1].trim())
+    const obM = s.match(/on-battery:\s*(\S+)/i)
+    if (obM && /^(yes|true)$/i.test(obM[1].trim())) onBattery = true
+    const tteM = s.match(/time to empty:\s*([^\n]+)/i)
+    const timeToEmpty = tteM ? tteM[1].trim() : ''
+    return { pct, state, onBattery, timeToEmpty }
+}
+
+/** @param {ReturnType<typeof parseUpsUpowerInfo>} p @param {boolean} connected UPower matched a UPS device */
+function formatUpsCaption(p, connected) {
+    if (!connected)
+        return {
+            line1: 'UPS',
+            line2: '—',
+            detail: 'No UPS (UPower or NUT). On NixOS: enable power.ups, set secrets/nut.password, `upsc prolink@localhost`.',
+        }
+    if (p.pct == null) {
+        if (p.onBattery)
+            return {
+                line1: 'On battery',
+                line2: '—',
+                detail: 'On mains loss; percentage not reported yet.',
+            }
+        return {
+            line1: 'Connected',
+            line2: '',
+            detail: 'UPS detected. Waiting for charge % from UPower/NUT.',
+        }
+    }
+    if (p.onBattery) {
+        let line2 = `${p.pct}%`
+        const t = p.timeToEmpty
+        if (t && !/^0(\.0)?\s*s/i.test(t) && !/^unknown/i.test(t) && t.length < 14) line2 = `${p.pct}% · ${t}`
+        return {
+            line1: 'On battery',
+            line2,
+            detail: `On battery · ${p.pct}%${p.timeToEmpty ? ` · ${p.timeToEmpty}` : ''}\nState: ${p.state || '—'}`,
+        }
+    }
+    return {
+        line1: 'Connected',
+        line2: '',
+        detail: `UPS on utility · ${p.pct}%\nState: ${p.state || '—'}`,
+    }
+}
+
+/** @param {ReturnType<typeof parseUpsUpowerInfo>} p @param {boolean} connected */
+function pickUpsIcon(p, connected) {
+    if (!connected) return 'battery-missing-symbolic'
+    /* Papirus / many themes omit power-plug-symbolic — use battery symbolics only. */
+    if (p.pct == null) return p.onBattery ? 'battery-empty-symbolic' : 'battery-full-charging-symbolic'
+    if (p.onBattery) {
+        if (p.pct <= 20) return 'battery-empty-symbolic'
+        if (p.pct <= 50) return 'battery-caution-symbolic'
+        if (p.pct <= 80) return 'battery-good-symbolic'
+        return 'battery-full-symbolic'
+    }
+    const st = String(p.state || '')
+    if (p.state === 'charging' || /\bchrg\b/i.test(st)) return 'battery-full-charging-symbolic'
+    return 'battery-full-symbolic'
+}
+
+let __upsShutdownArmed = true
+
+/** On battery and ≤50%: one-shot delayed poweroff (see hypr/scripts/ups-emergency-poweroff.sh). */
+function maybeUpsEmergencyShutdown(parsed) {
+    const pct = parsed.pct
+    const onBattery = parsed.onBattery
+    if (pct == null || Number.isNaN(pct)) return
+    if (!onBattery || pct > 55) {
+        __upsShutdownArmed = true
+        return
+    }
+    if (pct > 50) return
+    if (!__upsShutdownArmed) return
+    __upsShutdownArmed = false
+    const script = `${GLib.get_home_dir()}/.config/hypr/scripts/ups-emergency-poweroff.sh`
+    Utils.execAsync(['bash', script, String(pct)]).catch(() => {})
+}
+
+const upsStatus = Variable(UPS_STATUS_EMPTY, {
     poll: [
-        30_000,
+        10_000,
         () => {
             try {
-                const path = Utils.exec([
-                    'bash',
-                    '-c',
-                    'upower -e 2>/dev/null | grep -i ups | head -1',
-                ])?.trim()
-                if (!path) return ''
-                const info = Utils.exec(['upower', '-i', path])
-                const m = String(info).match(/percentage:\s+(\d+)/i)
-                return m ? `${m[1]}%` : ''
+                const path = upowerUpsPath()
+                if (path) {
+                    const info = Utils.exec(['upower', '-i', path])
+                    const parsed = parseUpsUpowerInfo(info)
+                    maybeUpsEmergencyShutdown(parsed)
+                    const cap = formatUpsCaption(parsed, true)
+                    return JSON.stringify({
+                        connected: true,
+                        source: 'upower',
+                        path,
+                        ...parsed,
+                        line1: cap.line1,
+                        line2: cap.line2,
+                        detail: cap.detail,
+                        icon: pickUpsIcon(parsed, true),
+                    })
+                }
+                const addr = nutUpsAddr()
+                const nutOut = Utils.exec(['upsc', addr])
+                if (!nutOut || String(nutOut).trim().length < 3) return UPS_STATUS_EMPTY
+                const parsed = parseUpsNutUpsc(nutOut)
+                maybeUpsEmergencyShutdown(parsed)
+                const cap = formatUpsCaption(parsed, true)
+                return JSON.stringify({
+                    connected: true,
+                    source: 'nut',
+                    path: addr,
+                    ...parsed,
+                    line1: cap.line1,
+                    line2: cap.line2,
+                    detail: `${cap.detail}\n(NUT ${addr})`,
+                    icon: pickUpsIcon(parsed, true),
+                })
             } catch {
-                return ''
+                return UPS_STATUS_EMPTY
             }
         },
     ],
@@ -1297,6 +1468,7 @@ function qsAdaptivePill(captionWidget, onMain, onMore, syncAll, services) {
         vertical: true,
         class_name: 'qs-tile-outer',
         hexpand: true,
+        vexpand: true,
         children: [stack, captionWidget],
         setup: (outer) => {
             const run = () => {
@@ -1316,6 +1488,7 @@ function qsWin11SimpleTile(iconWidget, captionRoot, onMain, setupSync) {
         vertical: true,
         class_name: 'qs-tile-outer',
         hexpand: true,
+        vexpand: true,
         children: [
             Widget.Button({
                 class_name: 'qs-tile-simple',
@@ -1480,21 +1653,64 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         },
     )
 
-    const upsTile = qsWin11SimpleTile(
-        Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'battery-full-symbolic' }),
-        Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5 }),
-        () => {},
-        (outer) => {
+    const upsIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'battery-full-symbolic' })
+    const upsCap = Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5, wrap: true, max_width_chars: 18 })
+    const upsTile = Widget.Box({
+        vertical: true,
+        class_name: 'qs-tile-outer qs-tile-ups',
+        hexpand: true,
+        vexpand: true,
+        children: [
+            Widget.Button({
+                class_name: 'qs-tile-simple',
+                hexpand: true,
+                vexpand: true,
+                cursor: 'pointer',
+                on_clicked: () => {
+                    try {
+                        const raw = upsStatus.value
+                        const j = JSON.parse(typeof raw === 'string' ? raw : '{}')
+                        const body = j.connected && j.detail ? String(j.detail).slice(0, 500) : 'No UPS data.'
+                        Utils.execAsync(['notify-send', '-a', 'UPS', 'Status', body]).catch(() => {})
+                    } catch {
+                        /* ignore */
+                    }
+                },
+                child: Widget.CenterBox({
+                    class_name: 'qs-tile-simple-inner',
+                    hexpand: true,
+                    vexpand: true,
+                    center_widget: upsIcon,
+                }),
+            }),
+            upsCap,
+        ],
+        setup: (outer) => {
             const sync = () => {
-                const v = String(upsSummary.value ?? '').trim()
-                const ok = v.length > 0 && v !== '—'
-                outer.toggleClassName('qs-tile-active', ok)
-                outer.tooltip_text = ok ? `UPS · ${v}` : 'UPS'
+                let j = { connected: false }
+                try {
+                    const raw = upsStatus.value
+                    j = JSON.parse(typeof raw === 'string' ? raw : '{}')
+                } catch {
+                    j = { connected: false }
+                }
+                const connected = !!j.connected
+                outer.toggleClassName('qs-tile-active', connected)
+                outer.toggleClassName('qs-tile-ups-batt', !!(connected && j.onBattery))
+                if (connected) {
+                    upsIcon.icon = j.icon || 'battery-full-symbolic'
+                    upsCap.label = j.line2 ? `${j.line1}\n${j.line2}` : String(j.line1 || 'UPS')
+                    outer.tooltip_text = `${j.detail || ''}\n\n≤50% on battery → power off in 90s (see notify).`
+                } else {
+                    upsIcon.icon = 'battery-missing-symbolic'
+                    upsCap.label = 'UPS\n—'
+                    outer.tooltip_text = 'UPS · UPower (USB). Click for details.'
+                }
             }
-            upsSummary.connect('notify::value', sync)
+            outer.hook(upsStatus, sync)
             sync()
         },
-    )
+    })
 
     return Widget.Window({
         monitor,
@@ -1517,12 +1733,14 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                         Widget.Box({
                             class_name: 'qs-row',
                             homogeneous: true,
+                            valign: 'fill',
                             spacing: 10,
                             children: [netTile, btTile, vpnTile],
                         }),
                         Widget.Box({
                             class_name: 'qs-row',
                             homogeneous: true,
+                            valign: 'fill',
                             spacing: 10,
                             children: [focusTile, nightTile, upsTile],
                         }),
