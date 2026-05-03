@@ -20,7 +20,10 @@ const BAR_CLEARANCE_PX = 72
 const WORKSPACE_GOTO = `${GLib.get_home_dir()}/.config/hypr/scripts/workspace-goto.sh`
 
 const time = Variable('', {
-    poll: [1000, () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })],
+    poll: [
+        1000,
+        () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+    ],
 })
 
 const dateLong = Variable('', {
@@ -1809,19 +1812,11 @@ function ClockBlock() {
         class_name: 'clock-wrap',
         valign: 'center',
         hpack: 'center',
-        spacing: 8,
-        children: [
-            Widget.Icon({
-                class_name: 'clock-ico',
-                size: 18,
-                icon: 'preferences-system-time-symbolic',
-            }),
-            Widget.Label({
-                class_name: 'clock',
-                xalign: 0,
-                label: time.bind(),
-            }),
-        ],
+        child: Widget.Label({
+            class_name: 'clock',
+            xalign: 0,
+            label: time.bind(),
+        }),
     })
 }
 
@@ -2170,10 +2165,6 @@ const Bar = (monitor) =>
                 valign: 'center',
                 children: [
                     WorkspacePills(monitor),
-                    Widget.Separator({
-                        class_name: 'title-sep',
-                        vertical: true,
-                    }),
                     Widget.Label({
                         class_name: 'app',
                         xalign: 0,

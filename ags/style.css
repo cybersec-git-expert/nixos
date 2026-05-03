@@ -46,13 +46,6 @@ window.bar button.ws-pill.active {
   border: none;
 }
 
-window.bar separator.title-sep {
-  margin: 0 2px;
-  min-width: 1px;
-  min-height: 22px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
 /* ---- Window title ---- */
 window.bar label.app {
   color: rgba(198, 206, 245, 0.88);
@@ -67,10 +60,6 @@ window.bar .clock-wrap {
   border-radius: 0;
   background: transparent;
   border: none;
-}
-
-window.bar image.clock-ico {
-  color: rgba(180, 190, 254, 0.95);
 }
 
 window.bar label.clock {

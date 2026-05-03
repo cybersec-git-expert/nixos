@@ -19,6 +19,9 @@ let
     export WAYLAND_DISPLAY="''${WAYLAND_DISPLAY:-wayland-1}"
     export PATH="/run/current-system/sw/bin''${PATH:+:$PATH}"
 
+    # Very long sleep: give NVIDIA/USB a moment before any DRM commands (reduces “can’t type in locker”).
+    sleep 2
+
     # Long S3 / hibernate: DRM stack sometimes needs a hard DPMS cycle, not only "on".
     /run/current-system/sw/bin/hyprctl dispatch dpms on >/dev/null 2>&1 || true
     sleep 0.4
@@ -56,7 +59,7 @@ let
     set -euo pipefail
     case "''${1:-}" in post) ;; *) exit 0 ;; esac
     # After many hours in sleep, USB + GPU can take noticeably longer to come back.
-    sleep 3
+    sleep 6
     runuser -u cyberexpert -- ${pkgs.bash}/bin/bash ${hyprResumeInner}
   '';
 in
