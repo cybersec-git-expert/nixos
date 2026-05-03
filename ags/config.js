@@ -9,6 +9,12 @@ import Utils from 'resource:///com/github/Aylur/ags/utils.js'
 /** All tray Gtk.Image icons use the same pixel size so they align visually. */
 const TRAY_ICON_PX = 16
 
+/**
+ * Top margin for overlay flyouts/scrim — must be ≥ real bar height.
+ * Overlay layer draws above `layer: 'top'` (the bar); a transparent scrim would otherwise cover the bar.
+ */
+const BAR_CLEARANCE_PX = 72
+
 const time = Variable('', {
     poll: [1000, () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })],
 })
@@ -23,6 +29,58 @@ const dateLong = Variable('', {
                 month: 'long',
                 day: 'numeric',
             }),
+    ],
+})
+
+const dateFooter = Variable('', {
+    poll: [
+        60_000,
+        () =>
+            new Date().toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+            }),
+    ],
+})
+
+const nightLightActive = Variable(false, {
+    poll: [
+        8000,
+        () => {
+            try {
+                const o = Utils.exec([
+                    'bash',
+                    '-c',
+                    'pgrep -x gammastep >/dev/null 2>&1 || pgrep -x wlsunset >/dev/null 2>&1 || pgrep -x redshift >/dev/null 2>&1 && echo 1 || echo 0',
+                ])
+                return String(o).trim() === '1'
+            } catch {
+                return false
+            }
+        },
+    ],
+})
+
+const upsSummary = Variable('—', {
+    poll: [
+        30_000,
+        () => {
+            try {
+                const path = Utils.exec([
+                    'bash',
+                    '-c',
+                    'upower -e 2>/dev/null | grep -i ups | head -1',
+                ])?.trim()
+                if (!path) return 'Not detected'
+                const info = Utils.exec(['upower', '-i', path])
+                const m = String(info).match(/percentage:\s+(\d+)/i)
+                return m ? `${m[1]}%` : 'UPS'
+            } catch {
+                return '—'
+            }
+        },
     ],
 })
 
@@ -99,17 +157,34 @@ function trayFlyoutName(/** @type {number} */ m) {
     return `trayFlyout${m}`
 }
 
-/** @param {number} m @param {boolean} open */
-function setFlyoutsOpen(m, open) {
-    const s = flyoutScrimName(m)
-    const t = trayFlyoutName(m)
-    if (open) {
-        App.openWindow(s)
-        App.openWindow(t)
-    } else {
-        App.closeWindow(t)
-        App.closeWindow(s)
+function quickSettingsName(/** @type {number} */ m) {
+    return `quickSettings${m}`
+}
+
+function closeAllMonitorOverlays(/** @type {number} */ m) {
+    App.closeWindow(trayFlyoutName(m))
+    App.closeWindow(quickSettingsName(m))
+    App.closeWindow(flyoutScrimName(m))
+}
+
+function toggleTrayFlyout(/** @type {number} */ m) {
+    if (App.getWindow(trayFlyoutName(m))?.visible) {
+        closeAllMonitorOverlays(m)
+        return
     }
+    closeAllMonitorOverlays(m)
+    App.openWindow(flyoutScrimName(m))
+    App.openWindow(trayFlyoutName(m))
+}
+
+function toggleQuickSettings(/** @type {number} */ m) {
+    if (App.getWindow(quickSettingsName(m))?.visible) {
+        closeAllMonitorOverlays(m)
+        return
+    }
+    closeAllMonitorOverlays(m)
+    App.openWindow(flyoutScrimName(m))
+    App.openWindow(quickSettingsName(m))
 }
 
 /** @param {any} n */
@@ -219,14 +294,14 @@ function FlyoutScrim(/** @type {number} */ monitor) {
         anchor: ['top', 'bottom', 'left', 'right'],
         exclusivity: 'ignore',
         layer: 'overlay',
-        margins: [52, 0, 0, 0],
+        margins: [BAR_CLEARANCE_PX, 0, 0, 0],
         visible: false,
         focusable: false,
         child: Widget.EventBox({
             hexpand: true,
             vexpand: true,
             on_primary_click: () => {
-                setFlyoutsOpen(monitor, false)
+                closeAllMonitorOverlays(monitor)
                 return true
             },
             child: Widget.Box({
@@ -322,7 +397,7 @@ function TrayFlyout(/** @type {number} */ monitor) {
         anchor: ['top', 'right'],
         exclusivity: 'normal',
         layer: 'overlay',
-        margins: [52, 16, 0, 0],
+        margins: [BAR_CLEARANCE_PX, 16, 0, 0],
         visible: false,
         child: Widget.Box({
             vertical: true,
@@ -367,6 +442,449 @@ function TrayFlyout(/** @type {number} */ monitor) {
     })
 }
 
+function toggleNightLightShell() {
+    Utils.execAsync([
+        'bash',
+        '-c',
+        `if pgrep -x gammastep >/dev/null 2>&1; then pkill gammastep;
+        elif pgrep -x wlsunset >/dev/null 2>&1; then pkill wlsunset;
+        elif pgrep -x redshift >/dev/null 2>&1; then pkill redshift;
+        else
+          (command -v gammastep >/dev/null && nohup gammastep -O 4500 >/dev/null 2>&1 &) ||
+          (command -v wlsunset >/dev/null && nohup wlsunset -t 4500 -T 6500 >/dev/null 2>&1 &) ||
+          (command -v redshift >/dev/null && nohup redshift -O 4500 >/dev/null 2>&1 &);
+        fi`,
+    ]).catch(() => {})
+}
+
+function qsMicSliderRow() {
+    return Widget.Box({
+        class_name: 'qs-slider-row',
+        spacing: 10,
+        valign: 'center',
+        children: [
+            Widget.Icon({
+                size: 22,
+                setup: (self) => {
+                    const sync = () => syncMicSymbolic(self)
+                    self.hook(Audio, sync)
+                    sync()
+                },
+            }),
+            Widget.Slider({
+                class_name: 'qs-slider',
+                hexpand: true,
+                draw_value: false,
+                min: 0,
+                max: 1,
+                step: 0.02,
+                setup: (self) => {
+                    let syncing = false
+                    const syncFromAudio = () => {
+                        if (self.dragging) return
+                        syncing = true
+                        self.value = Audio.microphone.volume
+                        syncing = false
+                    }
+                    self.hook(Audio, syncFromAudio)
+                    syncFromAudio()
+                    self.connect('value-changed', () => {
+                        if (syncing) return
+                        const m = Audio.microphone
+                        m.volume = self.value
+                        if (m.is_muted && self.value > 0.02) m.is_muted = false
+                    })
+                },
+            }),
+        ],
+    })
+}
+
+function qsSpeakerSliderRow() {
+    return Widget.Box({
+        class_name: 'qs-slider-row',
+        spacing: 10,
+        valign: 'center',
+        children: [
+            Widget.Icon({
+                size: 22,
+                setup: (self) => {
+                    const sync = () => syncSpeakerSymbolic(self)
+                    self.hook(Audio, sync)
+                    sync()
+                },
+            }),
+            Widget.Slider({
+                class_name: 'qs-slider',
+                hexpand: true,
+                draw_value: false,
+                min: 0,
+                max: 1,
+                step: 0.02,
+                setup: (self) => {
+                    let syncing = false
+                    const syncFromAudio = () => {
+                        if (self.dragging) return
+                        syncing = true
+                        self.value = Audio.speaker.volume
+                        syncing = false
+                    }
+                    self.hook(Audio, syncFromAudio)
+                    syncFromAudio()
+                    self.connect('value-changed', () => {
+                        if (syncing) return
+                        const sp = Audio.speaker
+                        sp.volume = self.value
+                        if (sp.is_muted && self.value > 0.02) sp.is_muted = false
+                    })
+                },
+            }),
+            Widget.Button({
+                class_name: 'qs-mixer-btn',
+                cursor: 'pointer',
+                tooltip_text: 'Open mixer',
+                valign: 'center',
+                child: Widget.Icon({ icon: 'preferences-system-details-symbolic', size: 16 }),
+                on_clicked: () => {
+                    Utils.execAsync(['bash', '-c', 'command -v pavucontrol >/dev/null && exec pavucontrol']).catch(() => {})
+                },
+            }),
+        ],
+    })
+}
+
+/**
+ * Pill with optional split: inactive = centered icon only; active = [ icon | › ].
+ * @param {any} captionWidget
+ * @param {() => void} onMain
+ * @param {() => void} onMore
+ * @param {(outer: any, icoIn: any, icoAct: any) => boolean} syncAll updates icons/labels; returns active (split + blue).
+ * @param {any[]} services services to hook for refresh
+ */
+function qsAdaptivePill(captionWidget, onMain, onMore, syncAll, services) {
+    const icoIn = Widget.Icon({ class_name: 'qs-tile-ico', size: 26 })
+    const icoAct = Widget.Icon({ class_name: 'qs-tile-ico', size: 26 })
+
+    const inactiveBtn = Widget.Button({
+        class_name: 'qs-tile-whole',
+        hexpand: true,
+        vexpand: true,
+        cursor: 'pointer',
+        tooltip_text: 'Toggle',
+        on_clicked: onMain,
+        child: Widget.CenterBox({
+            class_name: 'qs-tile-whole-inner',
+            hexpand: true,
+            vexpand: true,
+            center_widget: icoIn,
+        }),
+    })
+
+    const activeRow = Widget.Box({
+        class_name: 'qs-tile-split',
+        hexpand: true,
+        vexpand: true,
+        children: [
+            Widget.Button({
+                class_name: 'qs-tile-main',
+                hexpand: true,
+                vexpand: true,
+                cursor: 'pointer',
+                tooltip_text: 'Toggle',
+                on_clicked: onMain,
+                child: Widget.CenterBox({
+                    class_name: 'qs-tile-main-inner',
+                    hexpand: true,
+                    vexpand: true,
+                    center_widget: icoAct,
+                }),
+            }),
+            Widget.Separator({
+                class_name: 'qs-tile-vsep',
+                vertical: true,
+            }),
+            Widget.Button({
+                class_name: 'qs-tile-more',
+                cursor: 'pointer',
+                tooltip_text: 'More',
+                valign: 'fill',
+                vexpand: true,
+                on_clicked: onMore,
+                child: Widget.CenterBox({
+                    hexpand: true,
+                    vexpand: true,
+                    center_widget: Widget.Icon({
+                        class_name: 'qs-tile-chevron-ico',
+                        icon: 'pan-end-symbolic',
+                        size: 14,
+                    }),
+                }),
+            }),
+        ],
+    })
+
+    const stack = Widget.Stack({
+        class_name: 'qs-tile-stack',
+        transition: 'none',
+        hexpand: true,
+        children: {
+            inactive: inactiveBtn,
+            active: activeRow,
+        },
+        shown: 'inactive',
+    })
+
+    return Widget.Box({
+        vertical: true,
+        class_name: 'qs-tile-outer',
+        hexpand: true,
+        children: [stack, captionWidget],
+        setup: (outer) => {
+            const run = () => {
+                const active = syncAll(outer, icoIn, icoAct)
+                icoAct.icon = icoIn.icon
+                outer.toggleClassName('qs-tile-active', active)
+                stack.shown = active ? 'active' : 'inactive'
+            }
+            for (const s of services) outer.hook(s, run)
+            run()
+        },
+    })
+}
+
+function qsWin11SimpleTile(iconWidget, captionRoot, onMain, setupSync) {
+    return Widget.Box({
+        vertical: true,
+        class_name: 'qs-tile-outer',
+        hexpand: true,
+        children: [
+            Widget.Button({
+                class_name: 'qs-tile-simple',
+                hexpand: true,
+                vexpand: true,
+                cursor: 'pointer',
+                on_clicked: onMain,
+                child: Widget.CenterBox({
+                    class_name: 'qs-tile-simple-inner',
+                    hexpand: true,
+                    vexpand: true,
+                    center_widget: iconWidget,
+                }),
+            }),
+            captionRoot,
+        ],
+        setup: (self) => {
+            setupSync(self)
+        },
+    })
+}
+
+function QuickSettingsPanel(/** @type {number} */ monitor) {
+    const netLabel = Widget.Label({ class_name: 'qs-tile-cap', xalign: 0.5, wrap: true, max_width_chars: 14 })
+    const netTile = qsAdaptivePill(
+        netLabel,
+        () => {
+            if (Network.wifi) Network.toggleWifi()
+            else Utils.execAsync(['nm-connection-editor']).catch(() => {})
+        },
+        () => {
+            Utils.execAsync(['nm-connection-editor']).catch(() => {})
+        },
+        (_outer, icoIn) => {
+            if (Network.primary === 'wifi' && Network.wifi) {
+                icoIn.icon = Network.wifi.icon_name || 'network-wireless-symbolic'
+                netLabel.label = Network.wifi.ssid || 'Wi-Fi'
+                return Network.wifi.enabled && Network.wifi.internet === 'connected'
+            }
+            if (Network.primary === 'wired' && Network.wired) {
+                icoIn.icon = 'video-display-symbolic'
+                netLabel.label = 'Ethernet'
+                return Network.wired.internet === 'connected'
+            }
+            icoIn.icon = 'network-offline-symbolic'
+            netLabel.label = 'Network'
+            return false
+        },
+        [Network],
+    )
+
+    const btTile = qsAdaptivePill(
+        Widget.Label({ class_name: 'qs-tile-cap', label: 'Bluetooth', xalign: 0.5 }),
+        () => {
+            Bluetooth.enabled = !Bluetooth.enabled
+        },
+        () => {
+            Utils.execAsync([
+                'bash',
+                '-c',
+                'command -v blueman-manager >/dev/null && exec blueman-manager; command -v blueberry >/dev/null && exec blueberry; exit 0',
+            ]).catch(() => {})
+        },
+        (_outer, icoIn) => {
+            if (!Bluetooth.enabled) {
+                icoIn.icon = 'bluetooth-disabled-symbolic'
+            } else if ((Bluetooth.connected_devices?.length ?? 0) > 0) {
+                icoIn.icon = 'bluetooth-active-symbolic'
+            } else {
+                icoIn.icon = 'bluetooth-symbolic'
+            }
+            return Bluetooth.enabled
+        },
+        [Bluetooth],
+    )
+
+    const vpnIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'network-vpn-symbolic' })
+    const vpnTile = qsWin11SimpleTile(
+        vpnIcon,
+        Widget.Label({ class_name: 'qs-tile-cap', label: 'VPN', xalign: 0.5 }),
+        () => {
+            Utils.execAsync(['nm-connection-editor']).catch(() => {})
+        },
+        (outer) => {
+            const sync = () => {
+                const act = Network.vpn?.activated_connections ?? []
+                const c = act[0]
+                const on = c?.state === 'connected'
+                outer.toggleClassName('qs-tile-active', !!on)
+                if (c?.state === 'connecting' || c?.state === 'disconnecting') {
+                    vpnIcon.icon = 'network-vpn-acquiring-symbolic'
+                } else {
+                    vpnIcon.icon = 'network-vpn-symbolic'
+                }
+            }
+            outer.hook(Network, sync)
+            sync()
+        },
+    )
+
+    const focusIcon = Widget.Icon({
+        class_name: 'qs-tile-ico',
+        size: 26,
+        icon: 'preferences-system-notifications-symbolic',
+    })
+    const focusTile = qsWin11SimpleTile(
+        focusIcon,
+        Widget.Label({ class_name: 'qs-tile-cap', label: 'Focus assist', xalign: 0.5 }),
+        () => {
+            Notifications.dnd = !Notifications.dnd
+        },
+        (outer) => {
+            const sync = () => {
+                const dnd = Notifications.dnd
+                outer.toggleClassName('qs-tile-active', dnd)
+                focusIcon.icon = dnd ? 'weather-clear-night-symbolic' : 'preferences-system-notifications-symbolic'
+            }
+            outer.hook(Notifications, sync)
+            sync()
+        },
+    )
+
+    const nightIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'weather-clear-symbolic' })
+    const nightTile = qsWin11SimpleTile(
+        nightIcon,
+        Widget.Label({ class_name: 'qs-tile-cap', label: 'Night light', xalign: 0.5 }),
+        () => toggleNightLightShell(),
+        (outer) => {
+            const sync = () => {
+                const on = nightLightActive.value
+                outer.toggleClassName('qs-tile-active', on)
+                nightIcon.icon = on ? 'weather-clear-night-symbolic' : 'weather-clear-symbolic'
+            }
+            nightLightActive.connect('notify::value', sync)
+            sync()
+        },
+    )
+
+    const upsSub = Widget.Label({ class_name: 'qs-tile-subcap', xalign: 0.5 })
+    const upsTile = qsWin11SimpleTile(
+        Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'battery-full-symbolic' }),
+        Widget.Box({
+            vertical: true,
+            spacing: 2,
+            children: [
+                Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5 }),
+                upsSub,
+            ],
+        }),
+        () => {},
+        (outer) => {
+            const sync = () => {
+                upsSub.label = upsSummary.value
+                const ok = upsSummary.value !== '—' && upsSummary.value !== 'Not detected'
+                outer.toggleClassName('qs-tile-active', ok && !String(upsSummary.value).includes('Not'))
+            }
+            upsSummary.connect('notify::value', sync)
+            sync()
+        },
+    )
+
+    return Widget.Window({
+        monitor,
+        name: quickSettingsName(monitor),
+        class_name: 'qs-panel',
+        anchor: ['top', 'right'],
+        exclusivity: 'normal',
+        layer: 'overlay',
+        margins: [BAR_CLEARANCE_PX, 16, 0, 0],
+        visible: false,
+        child: Widget.Box({
+            vertical: true,
+            class_name: 'qs-shell',
+            children: [
+                Widget.Box({
+                    class_name: 'qs-grid',
+                    vertical: true,
+                    spacing: 8,
+                    children: [
+                        Widget.Box({
+                            class_name: 'qs-row',
+                            homogeneous: true,
+                            spacing: 10,
+                            children: [netTile, btTile, vpnTile],
+                        }),
+                        Widget.Box({
+                            class_name: 'qs-row',
+                            homogeneous: true,
+                            spacing: 10,
+                            children: [focusTile, nightTile, upsTile],
+                        }),
+                    ],
+                }),
+                Widget.Separator({ class_name: 'qs-sep' }),
+                qsMicSliderRow(),
+                qsSpeakerSliderRow(),
+                Widget.Separator({ class_name: 'qs-sep' }),
+                Widget.Box({
+                    class_name: 'qs-footer',
+                    valign: 'center',
+                    children: [
+                        Widget.Label({
+                            class_name: 'qs-footer-date',
+                            hexpand: true,
+                            xalign: 0,
+                            label: dateFooter.bind(),
+                        }),
+                        Widget.Button({
+                            class_name: 'qs-settings-btn',
+                            cursor: 'pointer',
+                            tooltip_text: 'Settings',
+                            valign: 'center',
+                            child: Widget.Icon({ icon: 'emblem-system-symbolic', size: 20 }),
+                            on_clicked: () => {
+                                Utils.execAsync([
+                                    'bash',
+                                    '-c',
+                                    'command -v gnome-control-center >/dev/null && exec gnome-control-center; command -v systemsettings5 >/dev/null && exec systemsettings5; exit 0',
+                                ]).catch(() => {})
+                            },
+                        }),
+                    ],
+                }),
+            ],
+        }),
+    })
+}
+
 function ClockBlock() {
     return Widget.Box({
         class_name: 'clock-wrap',
@@ -395,9 +913,7 @@ function NotificationTrayButton(/** @type {number} */ gdkMonitor) {
         cursor: 'pointer',
         tooltip_text: 'Notifications & calendar',
         on_primary_click: () => {
-            const wn = App.getWindow(trayFlyoutName(gdkMonitor))
-            const open = !(wn?.visible ?? false)
-            setFlyoutsOpen(gdkMonitor, open)
+            toggleTrayFlyout(gdkMonitor)
         },
         child: Widget.Label({
             class_name: 'tray-ico tray-bell',
@@ -451,12 +967,13 @@ function syncMicSymbolic(icon) {
 const VOL_SCROLL_STEP = 0.05
 const MIC_SCROLL_STEP = 0.05
 
-function VpnTrayIcon() {
+function VpnTrayIcon(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'vpn-tray',
         cursor: 'pointer',
-        tooltip_text: 'VPN · Click: connection editor',
-        on_primary_click: () => {
+        tooltip_text: 'VPN · Click: Quick settings · Right-click: editor',
+        on_primary_click: () => toggleQuickSettings(m),
+        on_secondary_click: () => {
             Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
         child: Widget.Icon({
@@ -489,12 +1006,13 @@ function VpnTrayIcon() {
     })
 }
 
-function BluetoothTrayIcon() {
+function BluetoothTrayIcon(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'bt-tray',
         cursor: 'pointer',
-        tooltip_text: 'Bluetooth · Click to open',
-        on_primary_click: () => {
+        tooltip_text: 'Bluetooth · Click: Quick settings · Right-click: manager',
+        on_primary_click: () => toggleQuickSettings(m),
+        on_secondary_click: () => {
             Utils.execAsync([
                 'bash',
                 '-c',
@@ -528,11 +1046,12 @@ function BluetoothTrayIcon() {
     })
 }
 
-function MicTray() {
+function MicTray(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'mic-tray',
         cursor: 'pointer',
-        tooltip_text: 'Scroll: mic level · Right-click: mute mic',
+        tooltip_text: 'Click: Quick settings · Scroll: mic · Right-click: mute',
+        on_primary_click: () => toggleQuickSettings(m),
         on_scroll_up: () => {
             const m = Audio.microphone
             if (m.is_muted) m.is_muted = false
@@ -562,11 +1081,12 @@ function MicTray() {
     })
 }
 
-function VolumeTray() {
+function VolumeTray(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'vol-tray',
         cursor: 'pointer',
-        tooltip_text: 'Scroll: volume · Right-click: mute / unmute',
+        tooltip_text: 'Click: Quick settings · Scroll: volume · Right-click: mute',
+        on_primary_click: () => toggleQuickSettings(m),
         on_scroll_up: () => {
             const sp = Audio.speaker
             if (sp.is_muted) sp.is_muted = false
@@ -596,34 +1116,42 @@ function VolumeTray() {
     })
 }
 
-/** Monitor / PC (freedesktop symbolic). */
-function NetworkComputerIcon() {
-    return Widget.Icon({
-        class_name: 'tray-ico',
-        size: TRAY_ICON_PX,
-        icon: 'video-display-symbolic',
-        setup: (self) => {
-            const online = () => {
-                if (Network.primary === 'wired')
-                    return Network.wired?.internet === 'connected'
-                if (Network.primary === 'wifi' && Network.wifi) {
-                    const w = Network.wifi
-                    return (
-                        !!w.enabled &&
-                        w.internet === 'connected' &&
-                        Network.connectivity !== 'none'
-                    )
-                }
-                return false
-            }
-            const sync = () => {
-                const on = online()
-                self.opacity = on ? 1 : 0.45
-                self.toggleClassName('offline', !on)
-            }
-            self.hook(Network, sync)
-            sync()
+/** Network tray — opens Quick settings (bar styling unchanged). */
+function NetworkTrayIcon(/** @type {number} */ m) {
+    return Widget.EventBox({
+        class_name: 'net-tray',
+        cursor: 'pointer',
+        tooltip_text: 'Network · Click: Quick settings · Right-click: connections',
+        on_primary_click: () => toggleQuickSettings(m),
+        on_secondary_click: () => {
+            Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
+        child: Widget.Icon({
+            class_name: 'tray-ico',
+            size: TRAY_ICON_PX,
+            icon: 'video-display-symbolic',
+            setup: (self) => {
+                const online = () => {
+                    if (Network.primary === 'wired') return Network.wired?.internet === 'connected'
+                    if (Network.primary === 'wifi' && Network.wifi) {
+                        const w = Network.wifi
+                        return (
+                            !!w.enabled &&
+                            w.internet === 'connected' &&
+                            Network.connectivity !== 'none'
+                        )
+                    }
+                    return false
+                }
+                const sync = () => {
+                    const on = online()
+                    self.opacity = on ? 1 : 0.45
+                    self.toggleClassName('offline', !on)
+                }
+                self.hook(Network, sync)
+                sync()
+            },
+        }),
     })
 }
 
@@ -666,11 +1194,11 @@ const Bar = (monitor) =>
                 spacing: 4,
                 hpack: 'end',
                 children: [
-                    TraySlot(VpnTrayIcon()),
-                    TraySlot(MicTray()),
-                    TraySlot(BluetoothTrayIcon()),
-                    TraySlot(NetworkComputerIcon()),
-                    TraySlot(VolumeTray()),
+                    TraySlot(VpnTrayIcon(monitor)),
+                    TraySlot(MicTray(monitor)),
+                    TraySlot(BluetoothTrayIcon(monitor)),
+                    TraySlot(NetworkTrayIcon(monitor)),
+                    TraySlot(VolumeTray(monitor)),
                     TraySlot(NotificationTrayButton(monitor)),
                 ],
             }),
@@ -679,10 +1207,10 @@ const Bar = (monitor) =>
 
 const bars = [...Array(nMon).keys()].map((i) => Bar(i))
 const flyoutScrims = [...Array(nMon).keys()].map((i) => FlyoutScrim(i))
+const quickSettingsWins = [...Array(nMon).keys()].map((i) => QuickSettingsPanel(i))
 const trayFlyouts = [...Array(nMon).keys()].map((i) => TrayFlyout(i))
 
 App.config({
     style: `${App.configDir}/style.css`,
-    /* Scrims first so tray flyout stacks above and stays clickable */
-    windows: [...bars, ...flyoutScrims, ...trayFlyouts],
+    windows: [...bars, ...flyoutScrims, ...quickSettingsWins, ...trayFlyouts],
 })

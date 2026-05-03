@@ -1,6 +1,7 @@
 /* Distinct UI type — install DM Sans / Plus Jakarta for best match */
 window.bar {
-  background-color: rgba(24, 24, 37, 0.94);
+  /* Fully opaque: overlay flyouts sit above layer `top`; avoid “see-through” if anything overlaps */
+  background-color: rgba(24, 24, 37, 1);
   color: rgba(230, 232, 250, 0.96);
   font-family:
     "DM Sans",
@@ -290,4 +291,206 @@ window.flyout-scrim {
 
 window.flyout-scrim box.flyout-scrim-fill {
   background-color: transparent;
+}
+
+/* ---- Quick settings only (Win11-style; does not style the bar) ---- */
+window.qs-panel {
+  font-family:
+    "DM Sans",
+    "Plus Jakarta Sans",
+    Inter,
+    "Segoe UI Variable Text",
+    system-ui,
+    sans-serif;
+}
+
+window.qs-panel .qs-shell {
+  min-width: 360px;
+  padding: 14px 14px 10px;
+  background-color: rgba(30, 30, 32, 0.98);
+  border-radius: 10px;
+  color: rgba(245, 245, 250, 0.96);
+}
+
+window.qs-panel .qs-tile-outer {
+  min-width: 0;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 255, 0.95);
+}
+
+window.qs-panel stack.qs-tile-stack {
+  min-height: 54px;
+}
+
+window.qs-panel .qs-tile-outer:not(.qs-tile-active):hover {
+  background-color: rgba(255, 255, 255, 0.11);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active {
+  background-color: rgba(0, 120, 215, 0.96);
+  color: rgba(16, 28, 40, 0.95);
+}
+
+window.qs-panel .qs-tile-split {
+  min-height: 54px;
+}
+
+window.qs-panel button.qs-tile-main,
+window.qs-panel button.qs-tile-more,
+window.qs-panel button.qs-tile-simple,
+window.qs-panel button.qs-tile-whole {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  min-height: 0;
+}
+
+window.qs-panel button.qs-tile-main:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active button.qs-tile-main:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+window.qs-panel button.qs-tile-more {
+  min-width: 34px;
+  padding: 0 6px;
+}
+
+window.qs-panel button.qs-tile-more:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active button.qs-tile-more:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+window.qs-panel .qs-tile-main-inner {
+  min-height: 54px;
+  padding: 6px 4px;
+}
+
+window.qs-panel button.qs-tile-simple,
+window.qs-panel button.qs-tile-whole {
+  min-height: 54px;
+}
+
+window.qs-panel .qs-tile-simple-inner,
+window.qs-panel .qs-tile-whole-inner {
+  min-height: 54px;
+  padding: 6px 4px;
+}
+
+window.qs-panel button.qs-tile-whole:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active button.qs-tile-whole:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+window.qs-panel separator.qs-tile-vsep {
+  margin: 0;
+  min-width: 1px;
+  min-height: 54px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active separator.qs-tile-vsep {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+window.qs-panel image.qs-tile-ico,
+window.qs-panel image.qs-tile-chevron-ico {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active image.qs-tile-ico,
+window.qs-panel .qs-tile-outer.qs-tile-active image.qs-tile-chevron-ico {
+  color: rgba(12, 24, 38, 0.92);
+}
+
+window.qs-panel label.qs-tile-cap {
+  margin-top: 6px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(240, 242, 250, 0.94);
+}
+
+window.qs-panel label.qs-tile-subcap {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(200, 208, 230, 0.82);
+  padding-bottom: 2px;
+}
+
+window.qs-panel .qs-tile-outer.qs-tile-active label.qs-tile-cap,
+window.qs-panel .qs-tile-outer.qs-tile-active label.qs-tile-subcap {
+  color: rgba(12, 24, 38, 0.92);
+}
+
+window.qs-panel separator.qs-sep {
+  margin: 10px 0;
+  min-height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+window.qs-panel .qs-slider-row {
+  margin: 4px 0;
+}
+
+window.qs-panel scale.qs-slider trough {
+  min-height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+window.qs-panel scale.qs-slider highlight {
+  border-radius: 999px;
+  background: rgba(86, 180, 255, 0.95);
+}
+
+window.qs-panel scale.qs-slider slider {
+  min-height: 18px;
+  min-width: 18px;
+  margin: -6px 0;
+}
+
+window.qs-panel button.qs-mixer-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+window.qs-panel button.qs-mixer-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+window.qs-panel .qs-footer {
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+window.qs-panel label.qs-footer-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(220, 225, 245, 0.92);
+}
+
+window.qs-panel button.qs-settings-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+window.qs-panel button.qs-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
