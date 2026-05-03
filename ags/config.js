@@ -105,7 +105,28 @@ function nutUpsAddr() {
     return GLib.getenv('NUT_UPS') || 'prolink@localhost'
 }
 
-/** @returns {{ pct: number|null, state: string, onBattery: boolean, timeToEmpty: string }} */
+/**
+ * `upsc` can keep returning old OL/% for a while after unplug; require USB id on the bus.
+ * Set `NUT_USB_ID=0` to disable this check. Override id with e.g. `NUT_USB_ID=09da:1234`.
+ */
+function nutUsbPresenceNeedle() {
+    const s = GLib.getenv('NUT_USB_ID')
+    if (s === '0' || s === 'off') return null
+    return s && String(s).trim() !== '' ? String(s).trim() : '0665:5161'
+}
+
+function nutUpsUsbPresent() {
+    const needle = nutUsbPresenceNeedle()
+    if (needle == null) return true
+    try {
+        const out = Utils.exec(['lsusb']) || ''
+        return out.includes(needle)
+    } catch {
+        return false
+    }
+}
+
+/** @returns {{ pct: number|null, state: string, onBattery: boolean, timeToEmpty: string, commLost: boolean }} */
 function parseUpsNutUpsc(text) {
     const m = {}
     for (const line of String(text).split('\n')) {
@@ -117,12 +138,15 @@ function parseUpsNutUpsc(text) {
     let pct = null
     const chM = charge != null ? String(charge).match(/^(\d+)/) : null
     if (chM) pct = parseInt(chM[1], 10)
-    const st = String(m['ups.status'] || '')
-    const onBattery = /\bob\b/i.test(st) || /\bdischrg\b/i.test(st) || /\blowbatt\b/i.test(st)
+    const stRaw = String(m['ups.status'] || '')
+    const st = stRaw.toLowerCase()
+    const commLost = /\bcomm\b/i.test(stRaw) || /\bstale\b/i.test(stRaw)
+    const onBattery =
+        !commLost && (/\bob\b/i.test(st) || /\bdischrg\b/i.test(st) || /\blowbatt\b/i.test(st))
     let timeToEmpty = ''
     const rt = m['battery.runtime']
     if (rt && /^\d+/.test(rt)) timeToEmpty = `${Math.round(parseInt(rt, 10) / 60)} min`
-    return { pct, state: st.toLowerCase(), onBattery, timeToEmpty }
+    return { pct, state: st, onBattery, timeToEmpty, commLost }
 }
 
 /** @returns {{ pct: number|null, state: string, onBattery: boolean, timeToEmpty: string }} */
@@ -147,7 +171,7 @@ function formatUpsCaption(p, connected) {
     if (!connected)
         return {
             line1: 'UPS',
-            line2: '—',
+            line2: '',
             detail: 'No UPS (UPower or NUT). On NixOS: enable power.ups, set secrets/nut.password, `upsc prolink@localhost`.',
         }
     if (p.pct == null) {
@@ -182,7 +206,7 @@ function formatUpsCaption(p, connected) {
 
 /** @param {ReturnType<typeof parseUpsUpowerInfo>} p @param {boolean} connected */
 function pickUpsIcon(p, connected) {
-    if (!connected) return 'battery-missing-symbolic'
+    if (!connected) return 'battery-symbolic'
     /* Papirus / many themes omit power-plug-symbolic — use battery symbolics only. */
     if (p.pct == null) return p.onBattery ? 'battery-empty-symbolic' : 'battery-full-charging-symbolic'
     if (p.onBattery) {
@@ -239,7 +263,9 @@ const upsStatus = Variable(UPS_STATUS_EMPTY, {
                 const addr = nutUpsAddr()
                 const nutOut = Utils.exec(['upsc', addr])
                 if (!nutOut || String(nutOut).trim().length < 3) return UPS_STATUS_EMPTY
+                if (!nutUpsUsbPresent()) return UPS_STATUS_EMPTY
                 const parsed = parseUpsNutUpsc(nutOut)
+                if (parsed.commLost) return UPS_STATUS_EMPTY
                 maybeUpsEmergencyShutdown(parsed)
                 const cap = formatUpsCaption(parsed, true)
                 return JSON.stringify({
@@ -1702,8 +1728,8 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                     upsCap.label = j.line2 ? `${j.line1}\n${j.line2}` : String(j.line1 || 'UPS')
                     outer.tooltip_text = `${j.detail || ''}\n\n≤50% on battery → power off in 90s (see notify).`
                 } else {
-                    upsIcon.icon = 'battery-missing-symbolic'
-                    upsCap.label = 'UPS\n—'
+                    upsIcon.icon = 'battery-symbolic'
+                    upsCap.label = 'UPS'
                     outer.tooltip_text = 'UPS · UPower (USB). Click for details.'
                 }
             }
