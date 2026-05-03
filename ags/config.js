@@ -101,6 +101,22 @@ function TraySlot(child) {
     })
 }
 
+/**
+ * Tray icon that is hidden unless `init` sets the slot `visible`.
+ * Volume, network, and notification use plain {@link TraySlot} instead.
+ * @param {any} child
+ * @param {(slot: any) => void} init hook services and assign `slot.visible`
+ */
+function TraySlotWhenActive(child, init) {
+    return Widget.Box({
+        class_name: 'tray-slot',
+        valign: 'center',
+        halign: 'center',
+        child,
+        setup: init,
+    })
+}
+
 /** Map GDK monitor index → Hyprland monitor (by layout origin). */
 function hyprMonitorForGdk(gdkIdx) {
     const disp = Gdk.Display.get_default()
@@ -1187,9 +1203,31 @@ const Bar = (monitor) =>
                 spacing: 4,
                 hpack: 'end',
                 children: [
-                    TraySlot(VpnTrayIcon(monitor)),
-                    TraySlot(MicTray(monitor)),
-                    TraySlot(BluetoothTrayIcon(monitor)),
+                    TraySlotWhenActive(VpnTrayIcon(monitor), (slot) => {
+                        const sync = () => {
+                            const act = Network.vpn?.activated_connections ?? []
+                            const s = act[0]?.state
+                            slot.visible =
+                                s === 'connected' || s === 'connecting' || s === 'disconnecting'
+                        }
+                        slot.hook(Network, sync)
+                        sync()
+                    }),
+                    TraySlotWhenActive(MicTray(monitor), (slot) => {
+                        const sync = () => {
+                            slot.visible = !!(Audio.microphone && Audio.microphone.is_muted)
+                        }
+                        slot.hook(Audio, sync)
+                        sync()
+                    }),
+                    TraySlotWhenActive(BluetoothTrayIcon(monitor), (slot) => {
+                        const sync = () => {
+                            const n = Bluetooth.connected_devices?.length ?? 0
+                            slot.visible = !!Bluetooth.enabled && n > 0
+                        }
+                        slot.hook(Bluetooth, sync)
+                        sync()
+                    }),
                     TraySlot(NetworkTrayIcon(monitor)),
                     TraySlot(VolumeTray(monitor)),
                     TraySlot(NotificationTrayButton(monitor)),
