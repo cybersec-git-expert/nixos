@@ -108,8 +108,8 @@ window.bar label.tray-bell {
   color: rgba(255, 255, 255, 0.88);
 }
 
-/* ---- Notification flyout (tray bell) ---- */
-window.nf-panel {
+/* ---- Tray flyout: calendar above notifications (tray bell) ---- */
+window.tray-flyout {
   font-family:
     "DM Sans",
     "Plus Jakarta Sans",
@@ -119,7 +119,7 @@ window.nf-panel {
     sans-serif;
 }
 
-window.nf-panel .nc-inner {
+window.tray-flyout .nc-inner {
   min-width: 340px;
   padding: 14px 16px 16px;
   background-color: rgba(30, 30, 40, 0.97);
@@ -128,16 +128,16 @@ window.nf-panel .nc-inner {
   color: rgba(230, 232, 250, 0.95);
 }
 
-window.nf-panel .nc-header {
+window.tray-flyout .nc-header {
   margin-bottom: 10px;
 }
 
-window.nf-panel label.nc-heading {
+window.tray-flyout label.nc-heading {
   font-weight: 700;
   font-size: 15px;
 }
 
-window.nf-panel button.nc-clear {
+window.tray-flyout button.nc-clear {
   background: transparent;
   color: rgba(137, 180, 250, 0.95);
   border: none;
@@ -146,42 +146,42 @@ window.nf-panel button.nc-clear {
   padding: 4px 8px;
 }
 
-window.nf-panel button.nc-clear:hover {
+window.tray-flyout button.nc-clear:hover {
   color: #b4c6ff;
 }
 
-window.nf-panel label.nc-empty {
+window.tray-flyout label.nc-empty {
   font-size: 12px;
   color: rgba(180, 190, 220, 0.75);
   padding: 8px 4px 12px;
 }
 
-window.nf-panel .nc-notif {
+window.tray-flyout .nc-notif {
   padding: 12px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-window.nf-panel label.nc-app {
+window.tray-flyout label.nc-app {
   font-weight: 600;
   font-size: 13px;
 }
 
-window.nf-panel label.nc-time {
+window.tray-flyout label.nc-time {
   font-size: 12px;
   color: rgba(180, 190, 220, 0.75);
 }
 
-window.nf-panel label.nc-sum {
+window.tray-flyout label.nc-sum {
   font-size: 13px;
   font-weight: 500;
 }
 
-window.nf-panel label.nc-body {
+window.tray-flyout label.nc-body {
   font-size: 12px;
   color: rgba(198, 206, 245, 0.85);
 }
 
-window.nf-panel button.nc-dismiss {
+window.tray-flyout button.nc-dismiss {
   background: transparent;
   border: none;
   color: rgba(230, 232, 250, 0.55);
@@ -190,23 +190,13 @@ window.nf-panel button.nc-dismiss {
   min-width: 28px;
 }
 
-window.nf-panel button.nc-dismiss:hover {
+window.tray-flyout button.nc-dismiss:hover {
   color: rgba(243, 139, 168, 0.95);
 }
 
-/* ---- Calendar flyout (right edge; notifications to its left) — minimal Win11-like ---- */
-window.cal-flyout {
-  font-family:
-    "DM Sans",
-    "Plus Jakarta Sans",
-    Inter,
-    "Segoe UI Variable Text",
-    system-ui,
-    sans-serif;
-}
-
-window.cal-flyout .cal-inner {
-  min-width: 280px;
+/* Calendar block (stacked above notifications) — minimal Win11-like */
+window.tray-flyout .cal-inner {
+  min-width: 340px;
   padding: 16px 18px 14px;
   background-color: rgba(30, 30, 40, 0.97);
   border: none;
@@ -214,30 +204,30 @@ window.cal-flyout .cal-inner {
   color: rgba(230, 232, 250, 0.95);
 }
 
-window.cal-flyout .cal-date-row {
+window.tray-flyout .cal-date-row {
   margin-bottom: 6px;
 }
 
-window.cal-flyout label.cal-date-main {
+window.tray-flyout label.cal-date-main {
   font-weight: 600;
   font-size: 15px;
 }
 
-window.cal-flyout image.cal-chev {
+window.tray-flyout image.cal-chev {
   opacity: 0.55;
 }
 
-window.cal-flyout .cal-nav {
+window.tray-flyout .cal-nav {
   margin-bottom: 8px;
 }
 
-window.cal-flyout label.cal-month {
+window.tray-flyout label.cal-month {
   font-weight: 600;
   font-size: 13px;
   color: rgba(230, 232, 250, 0.92);
 }
 
-window.cal-flyout button.cal-nav-btn {
+window.tray-flyout button.cal-nav-btn {
   background: transparent;
   border: none;
   padding: 4px;
@@ -247,29 +237,29 @@ window.cal-flyout button.cal-nav-btn {
   border-radius: 999px;
 }
 
-window.cal-flyout button.cal-nav-btn:hover {
+window.tray-flyout button.cal-nav-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.95);
 }
 
-window.cal-flyout calendar.cal-grid {
+window.tray-flyout calendar.cal-grid {
   background: transparent;
   border: none;
   padding: 4px 0 0;
 }
 
-window.cal-flyout calendar.cal-grid.view {
+window.tray-flyout calendar.cal-grid.view {
   background: transparent;
 }
 
-window.cal-flyout calendar.cal-grid.view header label {
+window.tray-flyout calendar.cal-grid.view header label {
   color: rgba(180, 190, 220, 0.8);
   font-weight: 600;
   font-size: 11px;
 }
 
 /* Gtk3 calendar cells are buttons with .day-number */
-window.cal-flyout calendar.cal-grid.view button.day-number {
+window.tray-flyout calendar.cal-grid.view button.day-number {
   color: rgba(230, 232, 250, 0.92);
   font-size: 13px;
   padding: 2px;
@@ -277,18 +267,27 @@ window.cal-flyout calendar.cal-grid.view button.day-number {
   border: none;
 }
 
-window.cal-flyout calendar.cal-grid.view button.day-number.other-month {
+window.tray-flyout calendar.cal-grid.view button.day-number.other-month {
   color: rgba(150, 160, 190, 0.42);
 }
 
-window.cal-flyout calendar.cal-grid.view button.day-number.today {
+window.tray-flyout calendar.cal-grid.view button.day-number.today {
   color: #0d1728;
   background-color: rgba(126, 170, 255, 0.92);
   border-radius: 999px;
 }
 
-window.cal-flyout calendar.cal-grid.view button.day-number:selected {
+window.tray-flyout calendar.cal-grid.view button.day-number:selected {
   color: rgba(230, 232, 250, 0.95);
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
+}
+
+/* Invisible fullscreen layer (below bar) — click closes flyout */
+window.flyout-scrim {
+  background: transparent;
+}
+
+window.flyout-scrim box.flyout-scrim-fill {
+  background-color: transparent;
 }

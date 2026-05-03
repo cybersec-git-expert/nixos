@@ -26,10 +26,6 @@ const dateLong = Variable('', {
     ],
 })
 
-/** Calendar outer width (min-width + horizontal padding) so notifications sit left of the calendar. */
-const CAL_OUTER_W = 322
-const FLYOUT_GAP = 12
-
 /** @param {any} cal */
 function monthYearFromCal(cal) {
     const [y, mo] = cal.date
@@ -95,24 +91,24 @@ function WorkspacePills(gdkIdx) {
     })
 }
 
-function notificationFlyoutName(/** @type {number} */ m) {
-    return `notifFlyout${m}`
+function flyoutScrimName(/** @type {number} */ m) {
+    return `flyoutScrim${m}`
 }
 
-function calendarFlyoutName(/** @type {number} */ m) {
-    return `calFlyout${m}`
+function trayFlyoutName(/** @type {number} */ m) {
+    return `trayFlyout${m}`
 }
 
 /** @param {number} m @param {boolean} open */
 function setFlyoutsOpen(m, open) {
-    const nn = notificationFlyoutName(m)
-    const cn = calendarFlyoutName(m)
+    const s = flyoutScrimName(m)
+    const t = trayFlyoutName(m)
     if (open) {
-        App.openWindow(nn)
-        App.openWindow(cn)
+        App.openWindow(s)
+        App.openWindow(t)
     } else {
-        App.closeWindow(nn)
-        App.closeWindow(cn)
+        App.closeWindow(t)
+        App.closeWindow(s)
     }
 }
 
@@ -214,54 +210,36 @@ function NotificationList() {
     })
 }
 
-/** @param {number} monitor Gdk index — notifications only; calendar is a separate window. */
-function NotificationFlyout(monitor) {
+/** Fullscreen (below bar) click-catcher — closes flyout when clicking outside the panel. */
+function FlyoutScrim(/** @type {number} */ monitor) {
     return Widget.Window({
         monitor,
-        name: notificationFlyoutName(monitor),
-        class_name: 'nf-panel',
-        anchor: ['top', 'right'],
-        exclusivity: 'normal',
+        name: flyoutScrimName(monitor),
+        class_name: 'flyout-scrim',
+        anchor: ['top', 'bottom', 'left', 'right'],
+        exclusivity: 'ignore',
         layer: 'overlay',
-        margins: [52, 16 + CAL_OUTER_W + FLYOUT_GAP, 0, 0],
+        margins: [52, 0, 0, 0],
         visible: false,
-        child: Widget.Box({
-            vertical: true,
-            class_name: 'nc-inner',
-            children: [
-                Widget.Box({
-                    class_name: 'nc-header',
-                    valign: 'center',
-                    children: [
-                        Widget.Label({
-                            class_name: 'nc-heading',
-                            hexpand: true,
-                            xalign: 0,
-                            label: 'Notifications',
-                        }),
-                        Widget.Button({
-                            class_name: 'nc-clear',
-                            label: 'Clear all',
-                            on_clicked: () => {
-                                Notifications.clear().catch(() => {})
-                            },
-                        }),
-                    ],
-                }),
-                Widget.Scrollable({
-                    class_name: 'nc-scroll',
-                    vscroll: 'always',
-                    hscroll: 'never',
-                    css: 'min-height: 140px;',
-                    child: NotificationList(),
-                }),
-            ],
+        focusable: false,
+        child: Widget.EventBox({
+            hexpand: true,
+            vexpand: true,
+            on_primary_click: () => {
+                setFlyoutsOpen(monitor, false)
+                return true
+            },
+            child: Widget.Box({
+                class_name: 'flyout-scrim-fill',
+                hexpand: true,
+                vexpand: true,
+            }),
         }),
     })
 }
 
-/** @param {number} monitor Gdk index — minimal calendar card at the screen edge (notifications to its left). */
-function CalendarFlyout(monitor) {
+/** Calendar block (stacked above notifications in `TrayFlyout`). */
+function CalendarBlock() {
     const calWidget = Widget.Calendar({
         class_name: 'cal-grid',
         show_heading: false,
@@ -292,10 +270,55 @@ function CalendarFlyout(monitor) {
     calWidget.connect('prev-month', syncMonth)
     calWidget.connect('next-month', syncMonth)
 
+    return Widget.Box({
+        vertical: true,
+        class_name: 'cal-inner',
+        children: [
+            Widget.Box({
+                class_name: 'cal-date-row',
+                valign: 'center',
+                children: [
+                    Widget.Label({
+                        class_name: 'cal-date-main',
+                        hexpand: true,
+                        xalign: 0,
+                        wrap: true,
+                        label: dateLong.bind(),
+                    }),
+                    Widget.Icon({ class_name: 'cal-chev', icon: 'pan-down-symbolic', size: 14 }),
+                ],
+            }),
+            Widget.Box({
+                class_name: 'cal-nav',
+                valign: 'center',
+                spacing: 4,
+                children: [
+                    Widget.Button({
+                        class_name: 'cal-nav-btn',
+                        cursor: 'pointer',
+                        child: Widget.Icon({ icon: 'go-previous-symbolic', size: 14 }),
+                        on_clicked: () => bump(-1),
+                    }),
+                    monthLbl,
+                    Widget.Button({
+                        class_name: 'cal-nav-btn',
+                        cursor: 'pointer',
+                        child: Widget.Icon({ icon: 'go-next-symbolic', size: 14 }),
+                        on_clicked: () => bump(1),
+                    }),
+                ],
+            }),
+            calWidget,
+        ],
+    })
+}
+
+/** Calendar on top, notifications below — top-right under the bar. */
+function TrayFlyout(/** @type {number} */ monitor) {
     return Widget.Window({
         monitor,
-        name: calendarFlyoutName(monitor),
-        class_name: 'cal-flyout',
+        name: trayFlyoutName(monitor),
+        class_name: 'tray-flyout',
         anchor: ['top', 'right'],
         exclusivity: 'normal',
         layer: 'overlay',
@@ -303,43 +326,42 @@ function CalendarFlyout(monitor) {
         visible: false,
         child: Widget.Box({
             vertical: true,
-            class_name: 'cal-inner',
+            class_name: 'flyout-stack',
+            spacing: 12,
             children: [
+                CalendarBlock(),
                 Widget.Box({
-                    class_name: 'cal-date-row',
-                    valign: 'center',
+                    vertical: true,
+                    class_name: 'nc-inner',
                     children: [
-                        Widget.Label({
-                            class_name: 'cal-date-main',
-                            hexpand: true,
-                            xalign: 0,
-                            wrap: true,
-                            label: dateLong.bind(),
+                        Widget.Box({
+                            class_name: 'nc-header',
+                            valign: 'center',
+                            children: [
+                                Widget.Label({
+                                    class_name: 'nc-heading',
+                                    hexpand: true,
+                                    xalign: 0,
+                                    label: 'Notifications',
+                                }),
+                                Widget.Button({
+                                    class_name: 'nc-clear',
+                                    label: 'Clear all',
+                                    on_clicked: () => {
+                                        Notifications.clear().catch(() => {})
+                                    },
+                                }),
+                            ],
                         }),
-                        Widget.Icon({ class_name: 'cal-chev', icon: 'pan-down-symbolic', size: 14 }),
+                        Widget.Scrollable({
+                            class_name: 'nc-scroll',
+                            vscroll: 'always',
+                            hscroll: 'never',
+                            css: 'min-height: 140px;',
+                            child: NotificationList(),
+                        }),
                     ],
                 }),
-                Widget.Box({
-                    class_name: 'cal-nav',
-                    valign: 'center',
-                    spacing: 4,
-                    children: [
-                        Widget.Button({
-                            class_name: 'cal-nav-btn',
-                            cursor: 'pointer',
-                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 14 }),
-                            on_clicked: () => bump(-1),
-                        }),
-                        monthLbl,
-                        Widget.Button({
-                            class_name: 'cal-nav-btn',
-                            cursor: 'pointer',
-                            child: Widget.Icon({ icon: 'go-next-symbolic', size: 14 }),
-                            on_clicked: () => bump(1),
-                        }),
-                    ],
-                }),
-                calWidget,
             ],
         }),
     })
@@ -373,7 +395,7 @@ function NotificationTrayButton(/** @type {number} */ gdkMonitor) {
         cursor: 'pointer',
         tooltip_text: 'Notifications & calendar',
         on_primary_click: () => {
-            const wn = App.getWindow(notificationFlyoutName(gdkMonitor))
+            const wn = App.getWindow(trayFlyoutName(gdkMonitor))
             const open = !(wn?.visible ?? false)
             setFlyoutsOpen(gdkMonitor, open)
         },
@@ -656,10 +678,11 @@ const Bar = (monitor) =>
     })
 
 const bars = [...Array(nMon).keys()].map((i) => Bar(i))
-const notifFlyouts = [...Array(nMon).keys()].map((i) => NotificationFlyout(i))
-const calFlyouts = [...Array(nMon).keys()].map((i) => CalendarFlyout(i))
+const flyoutScrims = [...Array(nMon).keys()].map((i) => FlyoutScrim(i))
+const trayFlyouts = [...Array(nMon).keys()].map((i) => TrayFlyout(i))
 
 App.config({
     style: `${App.configDir}/style.css`,
-    windows: [...bars, ...notifFlyouts, ...calFlyouts],
+    /* Scrims first so tray flyout stacks above and stays clickable */
+    windows: [...bars, ...flyoutScrims, ...trayFlyouts],
 })
