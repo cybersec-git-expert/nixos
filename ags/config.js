@@ -242,33 +242,49 @@ function NotificationCenterPanel(monitor) {
     })
 }
 
-/** @param {number} gdkMonitor */
-function ClockBlock(gdkMonitor) {
+function ClockBlock() {
+    return Widget.Box({
+        class_name: 'clock-wrap',
+        valign: 'center',
+        hpack: 'center',
+        spacing: 8,
+        children: [
+            Widget.Icon({
+                class_name: 'clock-ico',
+                size: 18,
+                icon: 'preferences-system-time-symbolic',
+            }),
+            Widget.Label({
+                class_name: 'clock',
+                xalign: 0,
+                label: time.bind(),
+            }),
+        ],
+    })
+}
+
+/** Opens the notification+calendar panel for this bar’s monitor (right of volume). */
+function NotificationTrayButton(/** @type {number} */ gdkMonitor) {
     const wname = notificationCenterName(gdkMonitor)
     return Widget.EventBox({
-        class_name: 'clock-hit',
+        class_name: 'notif-tray',
         cursor: 'pointer',
         tooltip_text: 'Notifications & calendar',
         on_primary_click: () => {
             App.toggleWindow(wname)
         },
-        child: Widget.Box({
-            class_name: 'clock-wrap',
-            valign: 'center',
-            hpack: 'center',
-            spacing: 8,
-            children: [
-                Widget.Icon({
-                    class_name: 'clock-ico',
-                    size: 18,
-                    icon: 'preferences-system-time-symbolic',
-                }),
-                Widget.Label({
-                    class_name: 'clock',
-                    xalign: 0,
-                    label: time.bind(),
-                }),
-            ],
+        child: Widget.Label({
+            class_name: 'tray-ico tray-bell',
+            /* Font Awesome bell (Nerd Font) */
+            label: '\uf0f3',
+            setup: (self) => {
+                const sync = () => {
+                    const n = Notifications.notifications?.length ?? 0
+                    self.opacity = n > 0 ? 1 : 0.55
+                }
+                self.hook(Notifications, sync)
+                sync()
+            },
         }),
     })
 }
@@ -518,7 +534,7 @@ const Bar = (monitor) =>
                     }),
                 ],
             }),
-            center_widget: ClockBlock(monitor),
+            center_widget: ClockBlock(),
             end_widget: Widget.Box({
                 class_name: 'right',
                 spacing: 4,
@@ -529,6 +545,7 @@ const Bar = (monitor) =>
                     TraySlot(BluetoothTrayIcon()),
                     TraySlot(NetworkComputerIcon()),
                     TraySlot(VolumeTray()),
+                    TraySlot(NotificationTrayButton(monitor)),
                 ],
             }),
         }),

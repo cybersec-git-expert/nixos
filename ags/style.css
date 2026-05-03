@@ -98,11 +98,17 @@ window.bar image.tray-ico.offline {
   color: rgba(255, 255, 255, 0.88);
 }
 
-window.bar eventbox.clock-hit {
-  border-radius: 0;
+/* Bell glyph (Nerd Font) — matches tray icon size */
+window.bar label.tray-bell {
+  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 5px 6px;
+  min-width: 1em;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-/* ---- Notification center + calendar (clock click) ---- */
+/* ---- Notification center + calendar (tray bell) ---- */
 window.nc-panel {
   font-family:
     "DM Sans",
