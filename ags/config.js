@@ -304,6 +304,43 @@ function nmcliSignalIcon(/** @type {number} */ strength) {
     return 'network-wireless-signal-none-symbolic'
 }
 
+/** First physical Ethernet device NM knows about, or null (no driver / no NIC). */
+function nmcliEthernetDevice() {
+    let out = ''
+    try {
+        out = Utils.exec(['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE', 'device']) || ''
+    } catch {
+        return null
+    }
+    for (const line of String(out).trim().split('\n')) {
+        if (!line) continue
+        const [dev, type] = line.split(':')
+        if (type !== 'ethernet' || !dev) continue
+        if (dev.startsWith('veth') || dev.startsWith('br')) continue
+        return dev
+    }
+    return null
+}
+
+/** Turn Wi-Fi radio off and ask NM to bring up wired (when an Ethernet device exists). */
+function preferEthernetOverWifi() {
+    const dev = nmcliEthernetDevice()
+    Utils.execAsync(['nmcli', 'radio', 'wifi', 'off'])
+        .then(() => (dev ? Utils.execAsync(['nmcli', '-w', '30', 'device', 'connect', dev]) : Promise.resolve()))
+        .then(() =>
+            Utils.execAsync([
+                'notify-send',
+                '-a',
+                'Network',
+                'Using wired',
+                dev ? `Wi-Fi off · ${dev}` : 'Wi-Fi off (no Ethernet device in NM)',
+            ]).catch(() => {}),
+        )
+        .catch(() =>
+            Utils.execAsync(['notify-send', '-a', 'Network', 'Wired', 'Could not switch to wired']).catch(() => {}),
+        )
+}
+
 /**
  * SSIDs from nmcli (several argv shapes — NM versions differ).
  * @returns {{ ssid: string, strength: number, active: boolean, secured: boolean, iconName: string }[]}
@@ -1300,15 +1337,17 @@ function qsWin11SimpleTile(iconWidget, captionRoot, onMain, setupSync) {
 
 function QuickSettingsPanel(/** @type {number} */ monitor) {
     const netLabel = Widget.Label({ class_name: 'qs-tile-cap', xalign: 0.5, wrap: true, max_width_chars: 14 })
-    const ethernetLive =
-        () =>
-            Network.primary === 'wired' &&
-            !!Network.wired &&
-            Network.wired.internet === 'connected'
+    // Do not require Network.primary === 'wired': NM often reports primary as Wi-Fi while
+    // Ethernet still carries the default route, so the tile wrongly showed only Wi-Fi.
+    const ethernetLive = () => !!Network.wired && Network.wired.internet === 'connected'
 
     const netTile = qsAdaptivePill(
         netLabel,
         () => {
+            if (nmcliEthernetDevice() && Network.wifi?.enabled && !ethernetLive()) {
+                preferEthernetOverWifi()
+                return
+            }
             if (ethernetLive() && Network.wifi) {
                 Network.toggleWifi()
                 return
@@ -1754,8 +1793,8 @@ function VolumeTray(/** @type {number} */ m) {
 
 /** True when the default route looks connected (wired or Wi-Fi). */
 function networkHasInternet() {
-    if (Network.primary === 'wired') return Network.wired?.internet === 'connected'
-    if (Network.primary === 'wifi' && Network.wifi) {
+    if (Network.wired?.internet === 'connected') return true
+    if (Network.wifi) {
         const w = Network.wifi
         return (
             !!w.enabled &&
@@ -1773,7 +1812,14 @@ function NetworkTrayIcon(/** @type {number} */ m) {
         cursor: 'pointer',
         setup: (self) => {
             const tip = () => {
-                if (networkHasInternet()) {
+                if (
+                    Network.wifi?.enabled &&
+                    nmcliEthernetDevice() &&
+                    Network.wired?.internet !== 'connected'
+                ) {
+                    self.tooltip_text =
+                        'Network · Click: Wi-Fi off & use Ethernet · Right-click: connection editor'
+                } else if (networkHasInternet()) {
                     self.tooltip_text = 'Network · Click: Quick settings · Right-click: connection editor'
                 } else if (Network.wifi) {
                     self.tooltip_text = 'Network · Click: Wi-Fi · Right-click: connection editor'
@@ -1785,6 +1831,14 @@ function NetworkTrayIcon(/** @type {number} */ m) {
             tip()
         },
         on_primary_click: () => {
+            if (
+                Network.wifi?.enabled &&
+                nmcliEthernetDevice() &&
+                Network.wired?.internet !== 'connected'
+            ) {
+                preferEthernetOverWifi()
+                return
+            }
             if (networkHasInternet()) toggleQuickSettings(m)
             else if (Network.wifi) toggleWifiMenu(m)
             else toggleQuickSettings(m)

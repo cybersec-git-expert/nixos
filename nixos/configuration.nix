@@ -73,7 +73,25 @@ in
   boot.loader.systemd-boot.configurationLimit = 4;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
-  boot.kernelPackages = pkgs.linuxPackages_6_6;  
+  # Was linuxPackages_6_6: PCI Wi-Fi MediaTek MT7925 (14c3:7925) has **no** `mt7925e` driver
+  # before kernel 6.7, so the card never binds → no wlan*, NM shows WIFI-HW missing, nmtui empty.
+  # RTL8125 rev 0c: in-tree `r8169` logs `unknown chip XID 688` and never binds — you need the
+  # vendor `r8125` module. nixpkgs’ 9.013.02 mirror fails on 6.12 (ethtool_keee); 9.015.00 builds.
+  boot.kernelPackages = pkgs.linuxPackages_6_12.extend (self: super: {
+    r8125 = super.r8125.overrideAttrs (old: rec {
+      version = "9.015.00";
+      src = pkgs.fetchFromGitHub {
+        owner = "notpeelz";
+        repo = "r8125";
+        rev = version;
+        sha256 = "1pcnlc6xqg3d73sqi2wjdpzvia0rd0dmcqsq8lv2n5l0xi45gqki";
+      };
+      meta = old.meta // { broken = false; };
+    });
+  });
+  boot.extraModulePackages = [ config.boot.kernelPackages.r8125 ];
+  # Let r8125 own the NIC; r8169 only errors on XID 688 and leaves no interface.
+  boot.blacklistedKernelModules = [ "r8169" ];
 
   # Nvidia: keep modeset/fbdev on the real kernel; do **not** load NVIDIA in initrd.
   # Loading nvidia_drm in stage-1 before `resume=` runs can leave the GPU half-initialized so
@@ -97,8 +115,7 @@ in
     # nv_drm_atomic_commit errors), add back: "mem_sleep_default=s2idle" as a tradeoff.
   ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "usbhid" "hid_generic" "evdev" "xhci_hcd" ];
-  boot.extraModulePackages = [ config.boot.kernelPackages.r8125 ];
+  boot.kernelModules = [ "usbhid" "hid_generic" "evdev" "xhci_hcd" "r8125" ];
 
   # GPU
   hardware.graphics.enable = true;
@@ -132,6 +149,8 @@ in
 
   # Network
   hardware.enableRedistributableFirmware = true;
+  # Extra blobs (some Wi‑Fi/BT combos) — helps MediaTek + others; allowUnfree is already on.
+  hardware.enableAllFirmware = true;
   networking.hostName = "nixos";
   networking.networkmanager.enable = true;
 
