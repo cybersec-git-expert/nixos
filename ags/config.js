@@ -63,7 +63,7 @@ const nightLightActive = Variable(false, {
     ],
 })
 
-const upsSummary = Variable('—', {
+const upsSummary = Variable('', {
     poll: [
         30_000,
         () => {
@@ -73,12 +73,12 @@ const upsSummary = Variable('—', {
                     '-c',
                     'upower -e 2>/dev/null | grep -i ups | head -1',
                 ])?.trim()
-                if (!path) return 'Not detected'
+                if (!path) return ''
                 const info = Utils.exec(['upower', '-i', path])
                 const m = String(info).match(/percentage:\s+(\d+)/i)
-                return m ? `${m[1]}%` : 'UPS'
+                return m ? `${m[1]}%` : ''
             } catch {
-                return '—'
+                return ''
             }
         },
     ],
@@ -795,23 +795,16 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         },
     )
 
-    const upsSub = Widget.Label({ class_name: 'qs-tile-subcap', xalign: 0.5 })
     const upsTile = qsWin11SimpleTile(
         Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'battery-full-symbolic' }),
-        Widget.Box({
-            vertical: true,
-            spacing: 2,
-            children: [
-                Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5 }),
-                upsSub,
-            ],
-        }),
+        Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5 }),
         () => {},
         (outer) => {
             const sync = () => {
-                upsSub.label = upsSummary.value
-                const ok = upsSummary.value !== '—' && upsSummary.value !== 'Not detected'
-                outer.toggleClassName('qs-tile-active', ok && !String(upsSummary.value).includes('Not'))
+                const v = String(upsSummary.value ?? '').trim()
+                const ok = v.length > 0 && v !== '—'
+                outer.toggleClassName('qs-tile-active', ok)
+                outer.tooltip_text = ok ? `UPS · ${v}` : 'UPS'
             }
             upsSummary.connect('notify::value', sync)
             sync()
