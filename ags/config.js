@@ -688,8 +688,11 @@ function wifiRowsForMenu() {
     return [...best.values()].sort((a, b) => b.strength - a.strength)
 }
 
-/** Win11-style Wi-Fi list (nmcli connect). */
-function WifiMenuPanel(/** @type {number} */ monitor) {
+/**
+ * Wi-Fi list + connect form. `compact`: no header row (for Quick Settings inline expand).
+ * @param {{ onDismiss: () => void }} opts
+ */
+function buildWifiMenuContent(/** @type {number} */ monitor, /** @type {boolean} */ compact, opts) {
     /** @type {string | null} */
     let selectedSsid = null
 
@@ -795,7 +798,7 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
                             if (sec && passwordEntry.text) args.push('password', passwordEntry.text)
                             Utils.execAsync(args)
                                 .then(() => {
-                                    closeAllMonitorOverlays(monitor)
+                                    opts.onDismiss()
                                     try {
                                         Network.wifi?.scan?.()
                                     } catch {
@@ -968,6 +971,97 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
         },
     })
 
+    const wifiMenuScroll = Widget.Scrollable({
+        class_name: 'wifi-menu-scroll',
+        vscroll: 'always',
+        hscroll: 'never',
+        hexpand: true,
+        css: 'min-height: 120px;',
+        child: listBin,
+    })
+
+    const wifiMoreBtn = Widget.Button({
+        class_name: 'wifi-menu-more',
+        cursor: 'pointer',
+        halign: 'start',
+        label: 'More Wi-Fi settings',
+        on_clicked: () => {
+            Utils.execAsync(['nm-connection-editor']).catch(() => {})
+        },
+    })
+
+    const wifiHead = Widget.Box({
+        class_name: 'wifi-menu-head',
+        valign: 'center',
+        spacing: 8,
+        children: [
+            Widget.Button({
+                class_name: 'wifi-menu-back',
+                cursor: 'pointer',
+                child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
+                on_clicked: () => opts.onDismiss(),
+            }),
+            Widget.Label({
+                class_name: 'wifi-menu-title',
+                hexpand: true,
+                xalign: 0,
+                label: 'Wi-Fi',
+            }),
+            wifiSw,
+        ],
+    })
+
+    const shell = Widget.Box({
+        vertical: true,
+        class_name: compact ? 'qs-embed-wifi wifi-menu-shell' : 'wifi-menu-shell',
+        children: compact
+            ? [wifiMenuScroll, errLbl, details, wifiMoreBtn]
+            : [wifiHead, wifiMenuScroll, errLbl, details, wifiMoreBtn],
+    })
+
+    /** @param {any} host */
+    function attachWifiMenuHooks(host) {
+        host.hook(Network, () => {
+            pullWifiSwitch(wifiSw)
+            if (!Network.wifi?.enabled) {
+                selectedSsid = null
+                errLbl.visible = false
+                rebuild()
+                return
+            }
+            rebuildList()
+            if (wifiRowsForMenu().length === 0) {
+                try {
+                    Network.wifi.scan?.()
+                } catch {
+                    /* ignore */
+                }
+                try {
+                    Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
+                } catch {
+                    try {
+                        Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
+                    } catch {
+                        /* ignore */
+                    }
+                }
+            }
+            if (selectedSsid && !wifiRowsForMenu().some((r) => r.ssid === selectedSsid)) {
+                selectedSsid = null
+                passwordEntry.text = ''
+                errLbl.visible = false
+                applyDetails()
+            }
+        })
+        rebuild()
+        pullWifiSwitch(wifiSw)
+    }
+
+    if (compact) {
+        attachWifiMenuHooks(shell)
+        return { shell }
+    }
+
     return Widget.Window({
         monitor,
         name: wifiMenuName(monitor),
@@ -978,86 +1072,16 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
         margins: [BAR_CLEARANCE_PX, 16, 0, 0],
         visible: false,
         setup: (self) => {
-            self.hook(Network, () => {
-                pullWifiSwitch(wifiSw)
-                if (!Network.wifi?.enabled) {
-                    selectedSsid = null
-                    errLbl.visible = false
-                    rebuild()
-                    return
-                }
-                rebuildList()
-                if (wifiRowsForMenu().length === 0) {
-                    try {
-                        Network.wifi.scan?.()
-                    } catch {
-                        /* ignore */
-                    }
-                    try {
-                        Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
-                    } catch {
-                        try {
-                            Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
-                        } catch {
-                            /* ignore */
-                        }
-                    }
-                }
-                if (selectedSsid && !wifiRowsForMenu().some((r) => r.ssid === selectedSsid)) {
-                    selectedSsid = null
-                    passwordEntry.text = ''
-                    errLbl.visible = false
-                    applyDetails()
-                }
-            })
-            rebuild()
-            pullWifiSwitch(wifiSw)
+            attachWifiMenuHooks(self)
         },
-        child: Widget.Box({
-            vertical: true,
-            class_name: 'wifi-menu-shell',
-            children: [
-                Widget.Box({
-                    class_name: 'wifi-menu-head',
-                    valign: 'center',
-                    spacing: 8,
-                    children: [
-                        Widget.Button({
-                            class_name: 'wifi-menu-back',
-                            cursor: 'pointer',
-                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
-                            on_clicked: () => closeAllMonitorOverlays(monitor),
-                        }),
-                        Widget.Label({
-                            class_name: 'wifi-menu-title',
-                            hexpand: true,
-                            xalign: 0,
-                            label: 'Wi-Fi',
-                        }),
-                        wifiSw,
-                    ],
-                }),
-                Widget.Scrollable({
-                    class_name: 'wifi-menu-scroll',
-                    vscroll: 'always',
-                    hscroll: 'never',
-                    hexpand: true,
-                    css: 'min-height: 120px;',
-                    child: listBin,
-                }),
-                errLbl,
-                details,
-                Widget.Button({
-                    class_name: 'wifi-menu-more',
-                    cursor: 'pointer',
-                    halign: 'start',
-                    label: 'More Wi-Fi settings',
-                    on_clicked: () => {
-                        Utils.execAsync(['nm-connection-editor']).catch(() => {})
-                    },
-                }),
-            ],
-        }),
+        child: shell,
+    })
+}
+
+/** Flyout Wi-Fi window (bar / offline path). */
+function WifiMenuPanel(/** @type {number} */ monitor) {
+    return buildWifiMenuContent(monitor, false, {
+        onDismiss: () => closeAllMonitorOverlays(monitor),
     })
 }
 
@@ -1141,8 +1165,11 @@ function bluetoothMenuDeviceRow(dev, rebuild) {
     })
 }
 
-/** In-panel Bluetooth device list (same shell pattern as Wi-Fi menu). */
-function BluetoothMenuPanel(/** @type {number} */ monitor) {
+/**
+ * Bluetooth list + adapter switch. `compact`: no header (Quick Settings inline).
+ * @param {{ onDismiss: () => void }} opts
+ */
+function buildBluetoothMenuContent(/** @type {number} */ monitor, /** @type {boolean} */ compact, opts) {
     const listBin = Widget.Box({ vertical: true, class_name: 'wifi-menu-list' })
 
     let btSwitchProgrammatic = false
@@ -1181,7 +1208,7 @@ function BluetoothMenuPanel(/** @type {number} */ monitor) {
                     class_name: 'wifi-menu-hint',
                     xalign: 0,
                     wrap: true,
-                    label: 'Bluetooth is off. Turn it on above to see devices.',
+                    label: 'Bluetooth is off. Turn it on from the tile above, or use the switch in the full menu.',
                 }),
             ]
             return
@@ -1205,12 +1232,74 @@ function BluetoothMenuPanel(/** @type {number} */ monitor) {
                     class_name: 'wifi-menu-hint',
                     xalign: 0,
                     wrap: true,
-                    label: 'No devices yet. Put accessories in pairing mode, then reopen this menu.',
+                    label: 'No devices yet. Put accessories in pairing mode, then reopen this list.',
                 }),
             ]
             return
         }
         listBin.children = devices.map((d) => bluetoothMenuDeviceRow(d, rebuild))
+    }
+
+    const btScroll = Widget.Scrollable({
+        class_name: 'wifi-menu-scroll',
+        vscroll: 'always',
+        hscroll: 'never',
+        hexpand: true,
+        css: 'min-height: 120px;',
+        child: listBin,
+    })
+
+    const btMoreBtn = Widget.Button({
+        class_name: 'wifi-menu-more',
+        cursor: 'pointer',
+        halign: 'start',
+        label: 'More Bluetooth settings',
+        on_clicked: () => {
+            Utils.execAsync([
+                'bash',
+                '-c',
+                'command -v blueman-manager >/dev/null && exec blueman-manager; command -v blueberry >/dev/null && exec blueberry; exit 0',
+            ]).catch(() => {})
+        },
+    })
+
+    const btHead = Widget.Box({
+        class_name: 'wifi-menu-head',
+        valign: 'center',
+        spacing: 8,
+        children: [
+            Widget.Button({
+                class_name: 'wifi-menu-back',
+                cursor: 'pointer',
+                child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
+                on_clicked: () => opts.onDismiss(),
+            }),
+            Widget.Label({
+                class_name: 'wifi-menu-title',
+                hexpand: true,
+                xalign: 0,
+                label: 'Bluetooth',
+            }),
+            btSw,
+        ],
+    })
+
+    const shell = Widget.Box({
+        vertical: true,
+        class_name: compact ? 'qs-embed-bt wifi-menu-shell' : 'wifi-menu-shell',
+        children: compact ? [btScroll, btMoreBtn] : [btHead, btScroll, btMoreBtn],
+    })
+
+    /** @param {any} host */
+    function attachBtHooks(host) {
+        host.hook(Bluetooth, () => rebuild())
+        rebuild()
+        pullBtSwitch(btSw)
+    }
+
+    if (compact) {
+        attachBtHooks(shell)
+        return { shell }
     }
 
     return Widget.Window({
@@ -1223,57 +1312,15 @@ function BluetoothMenuPanel(/** @type {number} */ monitor) {
         margins: [BAR_CLEARANCE_PX, 16, 0, 0],
         visible: false,
         setup: (self) => {
-            self.hook(Bluetooth, () => rebuild())
-            rebuild()
-            pullBtSwitch(btSw)
+            attachBtHooks(self)
         },
-        child: Widget.Box({
-            vertical: true,
-            class_name: 'wifi-menu-shell',
-            children: [
-                Widget.Box({
-                    class_name: 'wifi-menu-head',
-                    valign: 'center',
-                    spacing: 8,
-                    children: [
-                        Widget.Button({
-                            class_name: 'wifi-menu-back',
-                            cursor: 'pointer',
-                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
-                            on_clicked: () => closeAllMonitorOverlays(monitor),
-                        }),
-                        Widget.Label({
-                            class_name: 'wifi-menu-title',
-                            hexpand: true,
-                            xalign: 0,
-                            label: 'Bluetooth',
-                        }),
-                        btSw,
-                    ],
-                }),
-                Widget.Scrollable({
-                    class_name: 'wifi-menu-scroll',
-                    vscroll: 'always',
-                    hscroll: 'never',
-                    hexpand: true,
-                    css: 'min-height: 120px;',
-                    child: listBin,
-                }),
-                Widget.Button({
-                    class_name: 'wifi-menu-more',
-                    cursor: 'pointer',
-                    halign: 'start',
-                    label: 'More Bluetooth settings',
-                    on_clicked: () => {
-                        Utils.execAsync([
-                            'bash',
-                            '-c',
-                            'command -v blueman-manager >/dev/null && exec blueman-manager; command -v blueberry >/dev/null && exec blueberry; exit 0',
-                        ]).catch(() => {})
-                    },
-                }),
-            ],
-        }),
+        child: shell,
+    })
+}
+
+function BluetoothMenuPanel(/** @type {number} */ monitor) {
+    return buildBluetoothMenuContent(monitor, false, {
+        onDismiss: () => closeAllMonitorOverlays(monitor),
     })
 }
 
@@ -1653,6 +1700,314 @@ function qsSpeakerSliderRow() {
     })
 }
 
+/** Inline expand chevron (Ubuntu-style); clears the other QS embed axis when opening. */
+function qsChevronToggleBtn(qsMainVar, qsGridVar, /** @type {string} */ key, /** @type {string} */ tooltip) {
+    return Widget.Button({
+        class_name: 'qs-mixer-btn qs-chevron-toggle',
+        cursor: 'pointer',
+        tooltip_text: tooltip,
+        valign: 'center',
+        child: Widget.Icon({ icon: 'pan-end-symbolic', size: 16 }),
+        setup: (btn) => {
+            const sync = () => {
+                const on = qsMainVar.value === key
+                btn.child.icon = on ? 'pan-down-symbolic' : 'pan-end-symbolic'
+            }
+            qsMainVar.connect('notify::value', sync)
+            sync()
+        },
+        on_clicked: () => {
+            if (qsMainVar.value === key) qsMainVar.value = ''
+            else {
+                qsGridVar.value = ''
+                qsMainVar.value = key
+            }
+        },
+    })
+}
+
+function qsSpeakerExpandBlock(qsMainVar, qsGridVar) {
+    const list = Widget.Box({
+        vertical: true,
+        class_name: 'qs-embed-list',
+        setup: (lb) => {
+            const fill = () => {
+                let streams = []
+                try {
+                    streams = [...(Audio.speakers ?? [])]
+                } catch {
+                    streams = []
+                }
+                lb.children = streams.map((s) => {
+                    const cur = Audio.speaker
+                    const active = !!(cur && s && cur.id != null && s.id != null && cur.id === s.id)
+                    return Widget.Button({
+                        class_name: `qs-embed-row${active ? ' qs-embed-row-active' : ''}`,
+                        cursor: 'pointer',
+                        on_clicked: () => {
+                            Audio.speaker = s
+                        },
+                        child: Widget.Box({
+                            spacing: 10,
+                            valign: 'center',
+                            children: [
+                                Widget.Icon({
+                                    size: 18,
+                                    icon: s.icon_name || 'audio-speakers-symbolic',
+                                }),
+                                Widget.Label({
+                                    hexpand: true,
+                                    xalign: 0,
+                                    truncate: 'end',
+                                    label: String(s.description || s.name || 'Output'),
+                                }),
+                                ...(active
+                                    ? [Widget.Label({ class_name: 'qs-embed-check', label: '✓' })]
+                                    : []),
+                            ],
+                        }),
+                    })
+                })
+            }
+            lb.hook(Audio, fill)
+            fill()
+        },
+    })
+
+    const body = Widget.Box({
+        vertical: true,
+        class_name: 'qs-module-body',
+        spacing: 6,
+        setup: (self) => {
+            const sync = () => {
+                self.visible = qsMainVar.value === 'volume'
+            }
+            qsMainVar.connect('notify::value', sync)
+            sync()
+        },
+        children: [
+            Widget.Scrollable({
+                vscroll: 'always',
+                hscroll: 'never',
+                hexpand: true,
+                css: 'max-height: 220px;',
+                child: list,
+            }),
+            Widget.Button({
+                class_name: 'qs-embed-foot-btn',
+                halign: 'start',
+                cursor: 'pointer',
+                label: 'Sound settings',
+                on_clicked: () => {
+                    Utils.execAsync([
+                        'bash',
+                        '-c',
+                        'command -v gnome-control-center >/dev/null && exec gnome-control-center sound || exec pavucontrol',
+                    ]).catch(() => {})
+                },
+            }),
+        ],
+    })
+
+    return Widget.Box({
+        vertical: true,
+        class_name: 'qs-audio-module',
+        children: [
+            Widget.Box({
+                class_name: 'qs-slider-row',
+                spacing: 10,
+                valign: 'center',
+                children: [
+                    Widget.Icon({
+                        size: 22,
+                        setup: (self) => {
+                            const sync = () => syncSpeakerSymbolic(self)
+                            self.hook(Audio, sync)
+                            sync()
+                        },
+                    }),
+                    Widget.Slider({
+                        class_name: 'qs-slider',
+                        hexpand: true,
+                        draw_value: false,
+                        min: 0,
+                        max: 1,
+                        step: 0.02,
+                        setup: (self) => {
+                            let syncing = false
+                            const syncFromAudio = () => {
+                                if (self.dragging) return
+                                syncing = true
+                                self.value = Audio.speaker.volume
+                                syncing = false
+                            }
+                            self.hook(Audio, syncFromAudio)
+                            syncFromAudio()
+                            self.connect('value-changed', () => {
+                                if (syncing) return
+                                const sp = Audio.speaker
+                                sp.volume = self.value
+                                if (sp.is_muted && self.value > 0.02) sp.is_muted = false
+                            })
+                        },
+                    }),
+                    Widget.Button({
+                        class_name: 'qs-mixer-btn',
+                        cursor: 'pointer',
+                        tooltip_text: 'Open mixer',
+                        valign: 'center',
+                        child: Widget.Icon({ icon: 'preferences-system-details-symbolic', size: 16 }),
+                        on_clicked: () => {
+                            Utils.execAsync(['bash', '-c', 'command -v pavucontrol >/dev/null && exec pavucontrol']).catch(() => {})
+                        },
+                    }),
+                    qsChevronToggleBtn(qsMainVar, qsGridVar, 'volume', 'Outputs'),
+                ],
+            }),
+            body,
+        ],
+    })
+}
+
+function qsMicExpandBlock(qsMainVar, qsGridVar) {
+    const list = Widget.Box({
+        vertical: true,
+        class_name: 'qs-embed-list',
+        setup: (lb) => {
+            const fill = () => {
+                let streams = []
+                try {
+                    streams = [...(Audio.microphones ?? [])]
+                } catch {
+                    streams = []
+                }
+                lb.children = streams.map((s) => {
+                    const cur = Audio.microphone
+                    const active = !!(cur && s && cur.id != null && s.id != null && cur.id === s.id)
+                    return Widget.Button({
+                        class_name: `qs-embed-row${active ? ' qs-embed-row-active' : ''}`,
+                        cursor: 'pointer',
+                        on_clicked: () => {
+                            Audio.microphone = s
+                        },
+                        child: Widget.Box({
+                            spacing: 10,
+                            valign: 'center',
+                            children: [
+                                Widget.Icon({
+                                    size: 18,
+                                    icon: s.icon_name || 'audio-input-microphone-symbolic',
+                                }),
+                                Widget.Label({
+                                    hexpand: true,
+                                    xalign: 0,
+                                    truncate: 'end',
+                                    label: String(s.description || s.name || 'Input'),
+                                }),
+                                ...(active
+                                    ? [Widget.Label({ class_name: 'qs-embed-check', label: '✓' })]
+                                    : []),
+                            ],
+                        }),
+                    })
+                })
+            }
+            lb.hook(Audio, fill)
+            fill()
+        },
+    })
+
+    const body = Widget.Box({
+        vertical: true,
+        class_name: 'qs-module-body',
+        spacing: 6,
+        setup: (self) => {
+            const sync = () => {
+                self.visible = qsMainVar.value === 'mic'
+            }
+            qsMainVar.connect('notify::value', sync)
+            sync()
+        },
+        children: [
+            Widget.Scrollable({
+                vscroll: 'always',
+                hscroll: 'never',
+                hexpand: true,
+                css: 'max-height: 200px;',
+                child: list,
+            }),
+            Widget.Button({
+                class_name: 'qs-embed-foot-btn',
+                halign: 'start',
+                cursor: 'pointer',
+                label: 'Input settings',
+                on_clicked: () => {
+                    Utils.execAsync(['bash', '-c', 'command -v pavucontrol >/dev/null && exec pavucontrol']).catch(() => {})
+                },
+            }),
+        ],
+    })
+
+    return Widget.Box({
+        vertical: true,
+        class_name: 'qs-audio-module',
+        children: [
+            Widget.Box({
+                class_name: 'qs-slider-row',
+                spacing: 10,
+                valign: 'center',
+                children: [
+                    Widget.Icon({
+                        size: 22,
+                        setup: (self) => {
+                            const sync = () => syncMicSymbolic(self)
+                            self.hook(Audio, sync)
+                            sync()
+                        },
+                    }),
+                    Widget.Slider({
+                        class_name: 'qs-slider',
+                        hexpand: true,
+                        draw_value: false,
+                        min: 0,
+                        max: 1,
+                        step: 0.02,
+                        setup: (self) => {
+                            let syncing = false
+                            const syncFromAudio = () => {
+                                if (self.dragging) return
+                                syncing = true
+                                self.value = Audio.microphone.volume
+                                syncing = false
+                            }
+                            self.hook(Audio, syncFromAudio)
+                            syncFromAudio()
+                            self.connect('value-changed', () => {
+                                if (syncing) return
+                                const m = Audio.microphone
+                                m.volume = self.value
+                                if (m.is_muted && self.value > 0.02) m.is_muted = false
+                            })
+                        },
+                    }),
+                    Widget.Button({
+                        class_name: 'qs-mixer-btn',
+                        cursor: 'pointer',
+                        tooltip_text: 'Open mixer',
+                        valign: 'center',
+                        child: Widget.Icon({ icon: 'preferences-system-details-symbolic', size: 16 }),
+                        on_clicked: () => {
+                            Utils.execAsync(['bash', '-c', 'command -v pavucontrol >/dev/null && exec pavucontrol']).catch(() => {})
+                        },
+                    }),
+                    qsChevronToggleBtn(qsMainVar, qsGridVar, 'mic', 'Inputs'),
+                ],
+            }),
+            body,
+        ],
+    })
+}
+
 /**
  * Pill with optional split: inactive = centered icon only; active = [ icon | › ].
  * @param {any} captionWidget
@@ -1782,6 +2137,69 @@ function qsWin11SimpleTile(iconWidget, captionRoot, onMain, setupSync) {
 }
 
 function QuickSettingsPanel(/** @type {number} */ monitor) {
+    const qsMainEmbed = Variable('')
+    const qsGridEmbed = Variable('')
+    const wifiInline = buildWifiMenuContent(monitor, true, {
+        onDismiss: () => {
+            qsGridEmbed.value = ''
+        },
+    })
+    const btInline = buildBluetoothMenuContent(monitor, true, {
+        onDismiss: () => {
+            qsGridEmbed.value = ''
+        },
+    })
+
+    const rescanWifiForQs = () => {
+        try {
+            Network.wifi?.scan?.()
+        } catch {
+            /* ignore */
+        }
+        try {
+            Utils.exec(['nmcli', 'device', 'wifi', 'list', '--rescan', 'yes'])
+        } catch {
+            try {
+                Utils.exec(['nmcli', 'device', 'wifi', 'rescan'])
+            } catch {
+                /* ignore */
+            }
+        }
+    }
+
+    const toggleQsWifiEmbed = () => {
+        if (qsGridEmbed.value === 'wifi') qsGridEmbed.value = ''
+        else {
+            qsMainEmbed.value = ''
+            qsGridEmbed.value = 'wifi'
+            rescanWifiForQs()
+        }
+    }
+
+    const toggleQsBtEmbed = () => {
+        if (qsGridEmbed.value === 'bt') qsGridEmbed.value = ''
+        else {
+            qsMainEmbed.value = ''
+            qsGridEmbed.value = 'bt'
+        }
+    }
+
+    const qsGridEmbedHost = Widget.Box({
+        vertical: true,
+        class_name: 'qs-grid-embed-host',
+        setup: (host) => {
+            const sync = () => {
+                const g = qsGridEmbed.value
+                host.visible = g === 'wifi' || g === 'bt'
+                if (g === 'wifi') host.children = [wifiInline.shell]
+                else if (g === 'bt') host.children = [btInline.shell]
+                else host.children = []
+            }
+            qsGridEmbed.connect('notify::value', sync)
+            sync()
+        },
+    })
+
     const netLabel = Widget.Label({ class_name: 'qs-tile-cap', xalign: 0.5, wrap: true, max_width_chars: 14 })
     // Do not require Network.primary === 'wired': NM often reports primary as Wi-Fi while
     // Ethernet still carries the default route, so the tile wrongly showed only Wi-Fi.
@@ -1810,10 +2228,11 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                     /* ignore */
                 }
             }
-            toggleWifiMenu(monitor)
+            toggleQsWifiEmbed()
+            rescanWifiForQs()
         },
         () => {
-            if (Network.wifi) toggleWifiMenu(monitor)
+            if (Network.wifi) toggleQsWifiEmbed()
             else Utils.execAsync(['nm-connection-editor']).catch(() => {})
         },
         (_outer, icoIn) => {
@@ -1842,7 +2261,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
             Bluetooth.enabled = !Bluetooth.enabled
         },
         () => {
-            toggleBluetoothMenu(monitor)
+            toggleQsBtEmbed()
         },
         (_outer, icoIn) => {
             if (!Bluetooth.enabled) {
@@ -1987,6 +2406,14 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         layer: 'overlay',
         margins: [BAR_CLEARANCE_PX, 16, 0, 0],
         visible: false,
+        setup: (win) => {
+            win.connect('notify::visible', () => {
+                if (!win.visible) {
+                    qsMainEmbed.value = ''
+                    qsGridEmbed.value = ''
+                }
+            })
+        },
         child: Widget.Box({
             vertical: true,
             class_name: 'qs-shell',
@@ -2022,7 +2449,10 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                     class_name: 'qs-slider-block',
                     vertical: true,
                     spacing: 12,
-                    children: [qsSpeakerSliderRow(), qsMicSliderRow()],
+                    children: [
+                        qsSpeakerExpandBlock(qsMainEmbed, qsGridEmbed),
+                        qsMicExpandBlock(qsMainEmbed, qsGridEmbed),
+                    ],
                 }),
                 Widget.Separator({ class_name: 'qs-sep' }),
                 Widget.Box({
@@ -2057,6 +2487,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                                 }),
                             ],
                         }),
+                        qsGridEmbedHost,
                     ],
                 }),
             ],

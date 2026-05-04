@@ -523,6 +523,64 @@ window.qs-panel button.qs-mixer-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Inline Wi-Fi / Bluetooth under the tile grid (Ubuntu-style). */
+window.qs-panel .qs-grid-embed-host {
+  margin-top: 6px;
+}
+
+window.qs-panel .qs-embed-wifi.wifi-menu-shell,
+window.qs-panel .qs-embed-bt.wifi-menu-shell {
+  min-width: 0;
+  padding: 10px 12px 8px;
+  border-radius: 12px;
+  background-color: rgba(16, 16, 22, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+window.qs-panel .qs-audio-module + .qs-audio-module {
+  margin-top: 10px;
+}
+
+window.qs-panel .qs-audio-module .qs-module-body {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+window.qs-panel button.qs-embed-row {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: inherit;
+}
+
+window.qs-panel button.qs-embed-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+window.qs-panel button.qs-embed-row.qs-embed-row-active {
+  background: rgba(86, 180, 255, 0.12);
+}
+
+window.qs-panel label.qs-embed-check {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(245, 245, 250, 0.95);
+}
+
+window.qs-panel button.qs-embed-foot-btn {
+  background: transparent;
+  border: none;
+  padding: 6px 2px;
+  color: rgba(120, 190, 255, 0.95);
+  font-weight: 500;
+}
+
+window.qs-panel button.qs-embed-foot-btn:hover {
+  color: rgba(160, 210, 255, 1);
+}
+
 window.qs-panel .qs-header {
   margin-bottom: 0;
   padding: 4px 2px 10px;
@@ -741,5 +799,150 @@ window.wifi-menu button.wifi-menu-more {
 }
 
 window.wifi-menu button.wifi-menu-more:hover {
+  color: rgba(160, 200, 255, 1);
+}
+
+/* Wi-Fi / BT menu widgets reuse `wifi-menu-*` classes; flyout uses `window.wifi-menu`
+   but Quick Settings embeds use `window.qs-panel` — mirror key rules here. */
+window.qs-panel .qs-embed-wifi .wifi-menu-scroll,
+window.qs-panel .qs-embed-bt .wifi-menu-scroll {
+  min-height: 120px;
+  margin-bottom: 6px;
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-row,
+window.qs-panel .qs-embed-bt .wifi-menu-row {
+  border-radius: 6px;
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-row:hover,
+window.qs-panel .qs-embed-bt .wifi-menu-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-row-sel,
+window.qs-panel .qs-embed-bt .wifi-menu-row-sel {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-row-active label.wifi-menu-ssid,
+window.qs-panel .qs-embed-bt .wifi-menu-row-active label.wifi-menu-ssid {
+  color: rgba(130, 200, 255, 0.95);
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-row-inner,
+window.qs-panel .qs-embed-bt .wifi-menu-row-inner {
+  padding: 8px 6px;
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-sel-spacer,
+window.qs-panel .qs-embed-bt .wifi-menu-sel-spacer {
+  min-width: 3px;
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-sel-bar,
+window.qs-panel .qs-embed-bt .wifi-menu-sel-bar {
+  min-width: 3px;
+  border-radius: 2px;
+  background-color: rgba(0, 120, 215, 0.96);
+}
+
+window.qs-panel .qs-embed-wifi label.wifi-menu-ssid,
+window.qs-panel .qs-embed-bt label.wifi-menu-ssid {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+window.qs-panel .qs-embed-wifi label.wifi-menu-hint,
+window.qs-panel .qs-embed-bt label.wifi-menu-hint {
+  font-size: 12px;
+  color: rgba(200, 208, 230, 0.85);
+  padding: 16px 8px;
+}
+
+window.qs-panel .qs-embed-wifi label.wifi-menu-err {
+  font-size: 12px;
+  color: rgba(255, 140, 140, 0.95);
+  margin-bottom: 6px;
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-details {
+  padding: 8px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+}
+
+window.qs-panel .qs-embed-wifi label.wifi-menu-sub {
+  font-size: 12px;
+  color: rgba(190, 198, 220, 0.88);
+}
+
+window.qs-panel .qs-embed-wifi entry.wifi-menu-entry {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(245, 245, 250, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-eye {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-eye:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+window.qs-panel .qs-embed-wifi .wifi-menu-actions {
+  margin-top: 4px;
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-btn,
+window.qs-panel .qs-embed-bt button.wifi-menu-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-btn-primary,
+window.qs-panel .qs-embed-bt button.wifi-menu-btn-primary {
+  background: rgba(0, 120, 215, 0.96);
+  color: rgba(16, 28, 40, 0.95);
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-btn-primary:hover,
+window.qs-panel .qs-embed-bt button.wifi-menu-btn-primary:hover {
+  background: rgba(30, 145, 235, 0.98);
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-btn-ghost,
+window.qs-panel .qs-embed-bt button.wifi-menu-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 245, 250, 0.92);
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-btn-ghost:hover,
+window.qs-panel .qs-embed-bt button.wifi-menu-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-more,
+window.qs-panel .qs-embed-bt button.wifi-menu-more {
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  margin-top: 2px;
+  color: rgba(120, 180, 255, 0.95);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+window.qs-panel .qs-embed-wifi button.wifi-menu-more:hover,
+window.qs-panel .qs-embed-bt button.wifi-menu-more:hover {
   color: rgba(160, 200, 255, 1);
 }
