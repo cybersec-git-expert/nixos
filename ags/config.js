@@ -2198,21 +2198,6 @@ const Bar = (monitor) =>
                         slot.hook(Bluetooth, sync)
                         sync()
                     }),
-                    Widget.Box({
-                        class_name: 'tray-pill',
-                        valign: 'center',
-                        spacing: 0,
-                        children: [
-                            TraySlot(MicTray(monitor)),
-                            TraySlot(NetworkTrayIcon(monitor)),
-                            TraySlot(VolumeTray(monitor)),
-                        ],
-                    }),
-                    Widget.Box({
-                        class_name: 'tray-chip-circle',
-                        valign: 'center',
-                        child: TraySlot(NotificationTrayButton(monitor)),
-                    }),
                     TraySlotWhenActive(
                         Widget.Box({
                             class_name: 'tray-chip-circle tray-chip-ups',
@@ -2228,6 +2213,21 @@ const Bar = (monitor) =>
                             sync()
                         },
                     ),
+                    Widget.Box({
+                        class_name: 'tray-pill',
+                        valign: 'center',
+                        spacing: 0,
+                        children: [
+                            TraySlot(MicTray(monitor)),
+                            TraySlot(NetworkTrayIcon(monitor)),
+                            TraySlot(VolumeTray(monitor)),
+                        ],
+                    }),
+                    Widget.Box({
+                        class_name: 'tray-chip-circle',
+                        valign: 'center',
+                        child: TraySlot(NotificationTrayButton(monitor)),
+                    }),
                 ],
             }),
         }),
