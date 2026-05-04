@@ -10,6 +10,9 @@ import Utils from 'resource:///com/github/Aylur/ags/utils.js'
 /** All tray Gtk.Image icons use the same pixel size so they align visually. */
 const TRAY_ICON_PX = 16
 
+/** Quick-settings grid tiles — smaller icons = denser Win11-style pills. */
+const QS_TILE_ICON_PX = 20
+
 /**
  * Top margin for overlay flyouts/scrim — must be ≥ real bar height.
  * Overlay layer draws above `layer: 'top'` (the bar); a transparent scrim would otherwise cover the bar.
@@ -1352,6 +1355,16 @@ function qsMicSliderRow() {
                     })
                 },
             }),
+            Widget.Button({
+                class_name: 'qs-mixer-btn',
+                cursor: 'pointer',
+                tooltip_text: 'Open mixer',
+                valign: 'center',
+                child: Widget.Icon({ icon: 'preferences-system-details-symbolic', size: 16 }),
+                on_clicked: () => {
+                    Utils.execAsync(['bash', '-c', 'command -v pavucontrol >/dev/null && exec pavucontrol']).catch(() => {})
+                },
+            }),
         ],
     })
 }
@@ -1418,8 +1431,8 @@ function qsSpeakerSliderRow() {
  * @param {any[]} services services to hook for refresh
  */
 function qsAdaptivePill(captionWidget, onMain, onMore, syncAll, services) {
-    const icoIn = Widget.Icon({ class_name: 'qs-tile-ico', size: 26 })
-    const icoAct = Widget.Icon({ class_name: 'qs-tile-ico', size: 26 })
+    const icoIn = Widget.Icon({ class_name: 'qs-tile-ico', size: QS_TILE_ICON_PX })
+    const icoAct = Widget.Icon({ class_name: 'qs-tile-ico', size: QS_TILE_ICON_PX })
 
     const inactiveBtn = Widget.Button({
         class_name: 'qs-tile-whole',
@@ -1617,7 +1630,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         [Bluetooth],
     )
 
-    const vpnIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'network-vpn-symbolic' })
+    const vpnIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: QS_TILE_ICON_PX, icon: 'network-vpn-symbolic' })
     const vpnTile = qsWin11SimpleTile(
         vpnIcon,
         Widget.Label({ class_name: 'qs-tile-cap', label: 'VPN', xalign: 0.5 }),
@@ -1643,7 +1656,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
 
     const focusIcon = Widget.Icon({
         class_name: 'qs-tile-ico',
-        size: 26,
+        size: QS_TILE_ICON_PX,
         icon: 'preferences-system-notifications-symbolic',
     })
     const focusTile = qsWin11SimpleTile(
@@ -1663,7 +1676,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         },
     )
 
-    const nightIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'weather-clear-symbolic' })
+    const nightIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: QS_TILE_ICON_PX, icon: 'weather-clear-symbolic' })
     const nightTile = qsWin11SimpleTile(
         nightIcon,
         Widget.Label({ class_name: 'qs-tile-cap', label: 'Night light', xalign: 0.5 }),
@@ -1679,7 +1692,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
         },
     )
 
-    const upsIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: 26, icon: 'battery-full-symbolic' })
+    const upsIcon = Widget.Icon({ class_name: 'qs-tile-ico', size: QS_TILE_ICON_PX, icon: 'battery-full-symbolic' })
     const upsCap = Widget.Label({ class_name: 'qs-tile-cap', label: 'UPS', xalign: 0.5, wrap: true, max_width_chars: 18 })
     const upsTile = Widget.Box({
         vertical: true,
@@ -1778,27 +1791,44 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                     ],
                 }),
                 Widget.Separator({ class_name: 'qs-sep' }),
-                qsSpeakerSliderRow(),
-                qsMicSliderRow(),
+                Widget.Box({
+                    class_name: 'qs-slider-block',
+                    vertical: true,
+                    spacing: 12,
+                    children: [qsSpeakerSliderRow(), qsMicSliderRow()],
+                }),
                 Widget.Separator({ class_name: 'qs-sep' }),
                 Widget.Box({
-                    class_name: 'qs-grid',
+                    class_name: 'qs-grid-surface',
                     vertical: true,
-                    spacing: 8,
                     children: [
                         Widget.Box({
-                            class_name: 'qs-row',
-                            homogeneous: true,
-                            valign: 'fill',
-                            spacing: 10,
-                            children: [netTile, btTile, vpnTile],
-                        }),
-                        Widget.Box({
-                            class_name: 'qs-row',
-                            homogeneous: true,
-                            valign: 'fill',
-                            spacing: 10,
-                            children: [focusTile, nightTile, upsTile],
+                            class_name: 'qs-grid',
+                            vertical: true,
+                            spacing: 8,
+                            children: [
+                                Widget.Box({
+                                    class_name: 'qs-row',
+                                    homogeneous: true,
+                                    valign: 'fill',
+                                    spacing: 8,
+                                    children: [netTile, btTile],
+                                }),
+                                Widget.Box({
+                                    class_name: 'qs-row',
+                                    homogeneous: true,
+                                    valign: 'fill',
+                                    spacing: 8,
+                                    children: [vpnTile, focusTile],
+                                }),
+                                Widget.Box({
+                                    class_name: 'qs-row',
+                                    homogeneous: true,
+                                    valign: 'fill',
+                                    spacing: 8,
+                                    children: [nightTile, upsTile],
+                                }),
+                            ],
                         }),
                     ],
                 }),
