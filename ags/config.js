@@ -385,10 +385,15 @@ function wifiMenuName(/** @type {number} */ m) {
     return `wifiMenu${m}`
 }
 
+function bluetoothMenuName(/** @type {number} */ m) {
+    return `bluetoothMenu${m}`
+}
+
 function closeAllMonitorOverlays(/** @type {number} */ m) {
     App.closeWindow(trayFlyoutName(m))
     App.closeWindow(quickSettingsName(m))
     App.closeWindow(wifiMenuName(m))
+    App.closeWindow(bluetoothMenuName(m))
     App.closeWindow(flyoutScrimName(m))
 }
 
@@ -434,6 +439,16 @@ function toggleWifiMenu(/** @type {number} */ m) {
     }
     App.openWindow(flyoutScrimName(m))
     App.openWindow(wifiMenuName(m))
+}
+
+function toggleBluetoothMenu(/** @type {number} */ m) {
+    if (App.getWindow(bluetoothMenuName(m))?.visible) {
+        closeAllMonitorOverlays(m)
+        return
+    }
+    closeAllMonitorOverlays(m)
+    App.openWindow(flyoutScrimName(m))
+    App.openWindow(bluetoothMenuName(m))
 }
 
 /** @returns {Map<string, boolean>} SSID → needs password */
@@ -1046,6 +1061,222 @@ function WifiMenuPanel(/** @type {number} */ monitor) {
     })
 }
 
+/** @param {any} dev */
+function bluetoothMenuSubtitle(dev) {
+    if (dev.connecting) return 'Connecting…'
+    if (dev.connected) return 'Connected'
+    if (dev.paired) return 'Paired'
+    return 'Not paired'
+}
+
+/** @param {any} dev @param {() => void} rebuild */
+function bluetoothMenuDeviceRow(dev, rebuild) {
+    const title = String(dev.name || dev.alias || dev.address || 'Device')
+    const ico = Widget.Icon({
+        icon: dev.icon_name || 'bluetooth-symbolic',
+        size: 20,
+    })
+    const actionBtn = Widget.Button({
+        class_name: dev.connected ? 'wifi-menu-btn wifi-menu-btn-ghost' : 'wifi-menu-btn wifi-menu-btn-primary',
+        cursor: 'pointer',
+        sensitive: !dev.connecting,
+        valign: 'center',
+        label: dev.connecting ? '…' : dev.connected ? 'Disconnect' : 'Connect',
+        on_clicked: () => {
+            if (dev.connected) {
+                Bluetooth.connectDevice(dev, false, (ok) => {
+                    if (!ok) {
+                        Utils.execAsync(['notify-send', '-a', 'Bluetooth', 'Disconnect failed']).catch(() => {})
+                    }
+                    rebuild()
+                })
+            } else {
+                Bluetooth.connectDevice(dev, true, (ok) => {
+                    if (!ok) {
+                        Utils.execAsync([
+                            'notify-send',
+                            '-a',
+                            'Bluetooth',
+                            'Could not connect',
+                            'Try pairing from “More Bluetooth settings” if this device needs it.',
+                        ]).catch(() => {})
+                    }
+                    rebuild()
+                })
+            }
+        },
+    })
+    return Widget.Box({
+        vertical: true,
+        class_name: `wifi-menu-row${dev.connected ? ' wifi-menu-row-active' : ''}`,
+        children: [
+            Widget.Box({
+                class_name: 'wifi-menu-row-inner',
+                valign: 'center',
+                spacing: 10,
+                children: [
+                    ico,
+                    Widget.Box({
+                        vertical: true,
+                        hexpand: true,
+                        spacing: 2,
+                        children: [
+                            Widget.Label({
+                                class_name: 'wifi-menu-ssid',
+                                xalign: 0,
+                                hexpand: true,
+                                label: title,
+                            }),
+                            Widget.Label({
+                                class_name: 'wifi-menu-hint',
+                                xalign: 0,
+                                label: bluetoothMenuSubtitle(dev),
+                            }),
+                        ],
+                    }),
+                    actionBtn,
+                ],
+            }),
+        ],
+    })
+}
+
+/** In-panel Bluetooth device list (same shell pattern as Wi-Fi menu). */
+function BluetoothMenuPanel(/** @type {number} */ monitor) {
+    const listBin = Widget.Box({ vertical: true, class_name: 'wifi-menu-list' })
+
+    let btSwitchProgrammatic = false
+
+    /** @param {any} sw */
+    function pullBtSwitch(sw) {
+        const want = !!Bluetooth.enabled
+        if (!!sw.active === want) return
+        btSwitchProgrammatic = true
+        sw.active = want
+        btSwitchProgrammatic = false
+    }
+
+    const btSw = Widget.Switch({
+        valign: 'center',
+        class_name: 'wifi-menu-switch',
+        setup: (sw) => {
+            sw.connect('notify::active', () => {
+                if (btSwitchProgrammatic) return
+                const want = !!sw.active
+                if (!!Bluetooth.enabled === want) return
+                Bluetooth.enabled = want
+                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    rebuild()
+                    return GLib.SOURCE_REMOVE
+                })
+            })
+        },
+    })
+
+    function rebuild() {
+        pullBtSwitch(btSw)
+        if (!Bluetooth.enabled) {
+            listBin.children = [
+                Widget.Label({
+                    class_name: 'wifi-menu-hint',
+                    xalign: 0,
+                    wrap: true,
+                    label: 'Bluetooth is off. Turn it on above to see devices.',
+                }),
+            ]
+            return
+        }
+        let devices = []
+        try {
+            devices = [...(Bluetooth.devices ?? [])]
+        } catch {
+            devices = []
+        }
+        devices.sort((a, b) => {
+            if (!!a.connected !== !!b.connected) return a.connected ? -1 : 1
+            if (!!a.paired !== !!b.paired) return a.paired ? -1 : 1
+            const na = String(a.name || a.alias || a.address || '')
+            const nb = String(b.name || b.alias || b.address || '')
+            return na.localeCompare(nb)
+        })
+        if (devices.length === 0) {
+            listBin.children = [
+                Widget.Label({
+                    class_name: 'wifi-menu-hint',
+                    xalign: 0,
+                    wrap: true,
+                    label: 'No devices yet. Put accessories in pairing mode, then reopen this menu.',
+                }),
+            ]
+            return
+        }
+        listBin.children = devices.map((d) => bluetoothMenuDeviceRow(d, rebuild))
+    }
+
+    return Widget.Window({
+        monitor,
+        name: bluetoothMenuName(monitor),
+        class_name: 'wifi-menu',
+        anchor: ['top', 'right'],
+        exclusivity: 'normal',
+        layer: 'overlay',
+        margins: [BAR_CLEARANCE_PX, 16, 0, 0],
+        visible: false,
+        setup: (self) => {
+            self.hook(Bluetooth, () => rebuild())
+            rebuild()
+            pullBtSwitch(btSw)
+        },
+        child: Widget.Box({
+            vertical: true,
+            class_name: 'wifi-menu-shell',
+            children: [
+                Widget.Box({
+                    class_name: 'wifi-menu-head',
+                    valign: 'center',
+                    spacing: 8,
+                    children: [
+                        Widget.Button({
+                            class_name: 'wifi-menu-back',
+                            cursor: 'pointer',
+                            child: Widget.Icon({ icon: 'go-previous-symbolic', size: 18 }),
+                            on_clicked: () => closeAllMonitorOverlays(monitor),
+                        }),
+                        Widget.Label({
+                            class_name: 'wifi-menu-title',
+                            hexpand: true,
+                            xalign: 0,
+                            label: 'Bluetooth',
+                        }),
+                        btSw,
+                    ],
+                }),
+                Widget.Scrollable({
+                    class_name: 'wifi-menu-scroll',
+                    vscroll: 'always',
+                    hscroll: 'never',
+                    hexpand: true,
+                    css: 'min-height: 120px;',
+                    child: listBin,
+                }),
+                Widget.Button({
+                    class_name: 'wifi-menu-more',
+                    cursor: 'pointer',
+                    halign: 'start',
+                    label: 'More Bluetooth settings',
+                    on_clicked: () => {
+                        Utils.execAsync([
+                            'bash',
+                            '-c',
+                            'command -v blueman-manager >/dev/null && exec blueman-manager; command -v blueberry >/dev/null && exec blueberry; exit 0',
+                        ]).catch(() => {})
+                    },
+                }),
+            ],
+        }),
+    })
+}
+
 /** @param {any} n */
 function notificationRow(n) {
     const ts = n.time
@@ -1611,11 +1842,7 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
             Bluetooth.enabled = !Bluetooth.enabled
         },
         () => {
-            Utils.execAsync([
-                'bash',
-                '-c',
-                'command -v blueman-manager >/dev/null && exec blueman-manager; command -v blueberry >/dev/null && exec blueberry; exit 0',
-            ]).catch(() => {})
+            toggleBluetoothMenu(monitor)
         },
         (_outer, icoIn) => {
             if (!Bluetooth.enabled) {
@@ -1997,8 +2224,8 @@ function BluetoothTrayIcon(/** @type {number} */ m) {
     return Widget.EventBox({
         class_name: 'bt-tray',
         cursor: 'pointer',
-        tooltip_text: 'Bluetooth · Click: Quick settings · Right-click: manager',
-        on_primary_click: () => toggleQuickSettings(m),
+        tooltip_text: 'Bluetooth · Click: devices · Right-click: manager',
+        on_primary_click: () => toggleBluetoothMenu(m),
         on_secondary_click: () => {
             Utils.execAsync([
                 'bash',
@@ -2267,9 +2494,17 @@ const bars = [...Array(nMon).keys()].map((i) => Bar(i))
 const flyoutScrims = [...Array(nMon).keys()].map((i) => FlyoutScrim(i))
 const quickSettingsWins = [...Array(nMon).keys()].map((i) => QuickSettingsPanel(i))
 const wifiMenuWins = [...Array(nMon).keys()].map((i) => WifiMenuPanel(i))
+const bluetoothMenuWins = [...Array(nMon).keys()].map((i) => BluetoothMenuPanel(i))
 const trayFlyouts = [...Array(nMon).keys()].map((i) => TrayFlyout(i))
 
 App.config({
     style: `${App.configDir}/style.css`,
-    windows: [...bars, ...flyoutScrims, ...quickSettingsWins, ...wifiMenuWins, ...trayFlyouts],
+    windows: [
+        ...bars,
+        ...flyoutScrims,
+        ...quickSettingsWins,
+        ...wifiMenuWins,
+        ...bluetoothMenuWins,
+        ...trayFlyouts,
+    ],
 })
