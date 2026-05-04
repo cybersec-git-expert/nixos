@@ -62,6 +62,59 @@ let
     sleep 6
     runuser -u cyberexpert -- ${pkgs.bash}/bin/bash ${hyprResumeInner}
   '';
+
+  # Hibernate: kernel logs `mt7925e … pci_pm_freeze … returns -110` → hibernation exit / no S4.
+  # Unload only `mt7925e`: do **not** stop NetworkManager (that drops Ethernet too). Release the wlan
+  # iface with nmcli + ip, then rmmod. systemd-sleep clears PATH — use store paths throughout.
+  mt7925HibernateHook = pkgs.writeShellScript "61-mt7925-hibernate.sh" ''
+    set -eu
+    case "''${1:-}" in
+      pre)
+        if [[ "''${2:-}" == hibernate || "''${2:-}" == hybrid-sleep ]]; then
+          w=""
+          for d in /sys/class/net/*; do
+            [[ -e "$d/device/driver" ]] || continue
+            driver="$(${pkgs.coreutils}/bin/basename "$(${pkgs.coreutils}/bin/readlink -f "$d/device/driver")")"
+            if [[ "$driver" == mt7925e ]]; then
+              w="$(${pkgs.coreutils}/bin/basename "$d")"
+              break
+            fi
+          done
+          if [[ -n "$w" ]]; then
+            ${pkgs.networkmanager}/bin/nmcli -w 10 device disconnect "$w" 2>/dev/null || true
+            ${pkgs.iproute2}/bin/ip link set "$w" down 2>/dev/null || true
+            ${pkgs.coreutils}/bin/sleep 1
+          fi
+          ${pkgs.kmod}/bin/modprobe -r mt7925e 2>/dev/null || true
+        fi
+        ;;
+      post)
+        if [[ "''${2:-}" == hibernate || "''${2:-}" == hybrid-sleep ]]; then
+          ${pkgs.kmod}/bin/modprobe mt7925e 2>/dev/null || true
+          ${pkgs.coreutils}/bin/sleep 0.5
+          i=0
+          while [[ $i -lt 50 ]]; do
+            w=""
+            for d in /sys/class/net/*; do
+              [[ -e "$d/device/driver" ]] || continue
+              driver="$(${pkgs.coreutils}/bin/basename "$(${pkgs.coreutils}/bin/readlink -f "$d/device/driver")")"
+              if [[ "$driver" == mt7925e ]]; then
+                w="$(${pkgs.coreutils}/bin/basename "$d")"
+                break
+              fi
+            done
+            if [[ -n "$w" ]]; then
+              ${pkgs.iproute2}/bin/ip link set "$w" up 2>/dev/null || true
+              ${pkgs.networkmanager}/bin/nmcli -w 15 device connect "$w" 2>/dev/null || true
+              break
+            fi
+            i=$((i + 1))
+            ${pkgs.coreutils}/bin/sleep 0.1
+          done
+        fi
+        ;;
+    esac
+  '';
 in
 {
   imports = [ ./hardware-configuration.nix
@@ -144,6 +197,11 @@ in
   # then looks frozen (no pointer / can't type into a locker). Run recovery as the seat user.
   environment.etc."systemd/system-sleep/99-hypr-resume-recover.sh" = {
     source = hyprResumeRecover;
+    mode = "0755";
+  };
+
+  environment.etc."systemd/system-sleep/61-mt7925-hibernate.sh" = {
+    source = mt7925HibernateHook;
     mode = "0755";
   };
 

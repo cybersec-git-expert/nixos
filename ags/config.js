@@ -304,7 +304,7 @@ function TraySlot(child) {
 
 /**
  * Tray icon that is hidden unless `init` sets the slot `visible`.
- * Volume, network, and notification use plain {@link TraySlot} instead.
+ * VPN / Bluetooth / UPS-on-battery use this; the main tray pill uses {@link TraySlot}.
  * @param {any} child
  * @param {(slot: any) => void} init hook services and assign `slot.visible`
  */
@@ -1752,36 +1752,11 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
             class_name: 'qs-shell',
             children: [
                 Widget.Box({
-                    class_name: 'qs-grid',
-                    vertical: true,
-                    spacing: 8,
-                    children: [
-                        Widget.Box({
-                            class_name: 'qs-row',
-                            homogeneous: true,
-                            valign: 'fill',
-                            spacing: 10,
-                            children: [netTile, btTile, vpnTile],
-                        }),
-                        Widget.Box({
-                            class_name: 'qs-row',
-                            homogeneous: true,
-                            valign: 'fill',
-                            spacing: 10,
-                            children: [focusTile, nightTile, upsTile],
-                        }),
-                    ],
-                }),
-                Widget.Separator({ class_name: 'qs-sep' }),
-                qsMicSliderRow(),
-                qsSpeakerSliderRow(),
-                Widget.Separator({ class_name: 'qs-sep' }),
-                Widget.Box({
-                    class_name: 'qs-footer',
+                    class_name: 'qs-header',
                     valign: 'center',
                     children: [
                         Widget.Label({
-                            class_name: 'qs-footer-date',
+                            class_name: 'qs-header-date',
                             hexpand: true,
                             xalign: 0,
                             label: dateFooter.bind(),
@@ -1799,6 +1774,31 @@ function QuickSettingsPanel(/** @type {number} */ monitor) {
                                     'command -v gnome-control-center >/dev/null && exec gnome-control-center; command -v systemsettings5 >/dev/null && exec systemsettings5; exit 0',
                                 ]).catch(() => {})
                             },
+                        }),
+                    ],
+                }),
+                Widget.Separator({ class_name: 'qs-sep' }),
+                qsSpeakerSliderRow(),
+                qsMicSliderRow(),
+                Widget.Separator({ class_name: 'qs-sep' }),
+                Widget.Box({
+                    class_name: 'qs-grid',
+                    vertical: true,
+                    spacing: 8,
+                    children: [
+                        Widget.Box({
+                            class_name: 'qs-row',
+                            homogeneous: true,
+                            valign: 'fill',
+                            spacing: 10,
+                            children: [netTile, btTile, vpnTile],
+                        }),
+                        Widget.Box({
+                            class_name: 'qs-row',
+                            homogeneous: true,
+                            valign: 'fill',
+                            spacing: 10,
+                            children: [focusTile, nightTile, upsTile],
                         }),
                     ],
                 }),
@@ -2177,7 +2177,7 @@ const Bar = (monitor) =>
             center_widget: ClockBlock(),
             end_widget: Widget.Box({
                 class_name: 'right',
-                spacing: 4,
+                spacing: 8,
                 hpack: 'end',
                 children: [
                     TraySlotWhenActive(VpnTrayIcon(monitor), (slot) => {
@@ -2190,21 +2190,6 @@ const Bar = (monitor) =>
                         slot.hook(Network, sync)
                         sync()
                     }),
-                    TraySlotWhenActive(UpsBarTray(monitor), (slot) => {
-                        const ev = slot.child
-                        const sync = () => {
-                            if (typeof ev.syncUpsTray === 'function') ev.syncUpsTray(slot)
-                        }
-                        slot.hook(upsStatus, sync)
-                        sync()
-                    }),
-                    TraySlotWhenActive(MicTray(monitor), (slot) => {
-                        const sync = () => {
-                            slot.visible = !!(Audio.microphone && Audio.microphone.is_muted)
-                        }
-                        slot.hook(Audio, sync)
-                        sync()
-                    }),
                     TraySlotWhenActive(BluetoothTrayIcon(monitor), (slot) => {
                         const sync = () => {
                             const n = Bluetooth.connected_devices?.length ?? 0
@@ -2213,9 +2198,36 @@ const Bar = (monitor) =>
                         slot.hook(Bluetooth, sync)
                         sync()
                     }),
-                    TraySlot(NetworkTrayIcon(monitor)),
-                    TraySlot(VolumeTray(monitor)),
-                    TraySlot(NotificationTrayButton(monitor)),
+                    Widget.Box({
+                        class_name: 'tray-pill',
+                        valign: 'center',
+                        spacing: 0,
+                        children: [
+                            TraySlot(MicTray(monitor)),
+                            TraySlot(NetworkTrayIcon(monitor)),
+                            TraySlot(VolumeTray(monitor)),
+                        ],
+                    }),
+                    Widget.Box({
+                        class_name: 'tray-chip-circle',
+                        valign: 'center',
+                        child: TraySlot(NotificationTrayButton(monitor)),
+                    }),
+                    TraySlotWhenActive(
+                        Widget.Box({
+                            class_name: 'tray-chip-circle tray-chip-ups',
+                            valign: 'center',
+                            child: UpsBarTray(monitor),
+                        }),
+                        (slot) => {
+                            const upsEv = slot.child?.child
+                            const sync = () => {
+                                if (upsEv && typeof upsEv.syncUpsTray === 'function') upsEv.syncUpsTray(slot)
+                            }
+                            slot.hook(upsStatus, sync)
+                            sync()
+                        },
+                    ),
                 ],
             }),
         }),

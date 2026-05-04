@@ -7,6 +7,28 @@ set -euo pipefail
 PATH="${PATH}:/run/current-system/sw/bin:/usr/bin:/bin"
 SYSTEMCTL="/run/current-system/sw/bin/systemctl"
 
+# Hibernate needs enough *swap* to hold the RAM image. If swap < RAM, the kernel usually
+# aborts mid-way: screens go dark, then the session resumes and hypridle’s after_sleep_cmd
+# turns monitors back on — looks like “PC never powered off” / “woke by itself”.
+hibernate_preflight() {
+    local mem_kb swap_kb
+    mem_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo)
+    swap_kb=$(awk '/^SwapTotal:/{print $2}' /proc/meminfo)
+    if (( swap_kb == 0 )); then
+        notify-send -u critical "Hibernate" \
+            "No swap (SwapTotal=0). NixOS needs a real swap partition (or file) sized ≥ RAM for hibernate." \
+            -i system-shutdown 2>/dev/null || true
+        return 1
+    fi
+    if (( swap_kb < mem_kb )); then
+        notify-send -u critical "Hibernate" \
+            "Swap (${swap_kb} KiB) is smaller than RAM (${mem_kb} KiB). Hibernate usually aborts; enlarge swap or use Suspend." \
+            -i system-shutdown 2>/dev/null || true
+        return 1
+    fi
+    return 0
+}
+
 # UPS safety — block suspend/hibernate when on battery and charge ≤ 50%
 ups_safe_to_suspend() {
     command -v upsc &>/dev/null || return 0
@@ -35,6 +57,7 @@ case "$cmd" in
         ;;
     hibernate)
         ups_safe_to_suspend || exec "$SYSTEMCTL" poweroff
+        hibernate_preflight || exit 1
         exec "$SYSTEMCTL" hibernate
         ;;
     reboot|restart)

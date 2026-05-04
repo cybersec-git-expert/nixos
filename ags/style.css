@@ -69,7 +69,7 @@ window.bar label.clock {
   letter-spacing: 0.06em;
 }
 
-/* ---- Tray (unchanged layout) ---- */
+/* ---- Tray: pill (mic · net · vol) + circles (bell, UPS on battery) ---- */
 window.bar .right {
   padding: 6px 10px 6px 0;
 }
@@ -78,6 +78,37 @@ window.bar .tray-slot {
   min-width: 28px;
   min-height: 28px;
   padding: 0 1px;
+}
+
+window.bar .tray-pill {
+  background-color: rgba(43, 43, 46, 0.96);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+window.bar .tray-pill .tray-slot {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 4px;
+}
+
+window.bar .tray-chip-circle {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 999px;
+  background-color: rgba(43, 43, 46, 0.96);
+}
+
+window.bar .tray-chip-circle .tray-slot {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+/* UPS on mains loss: icon + % — slightly wider than a single icon */
+window.bar .tray-chip-ups {
+  min-width: 52px;
+  padding: 0 8px;
 }
 
 window.bar image.tray-ico {
@@ -493,12 +524,12 @@ window.qs-panel button.qs-mixer-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-window.qs-panel .qs-footer {
-  margin-top: 4px;
-  padding-top: 8px;
+window.qs-panel .qs-header {
+  margin-bottom: 2px;
+  padding-bottom: 6px;
 }
 
-window.qs-panel label.qs-footer-date {
+window.qs-panel label.qs-header-date {
   font-size: 12px;
   font-weight: 600;
   color: rgba(220, 225, 245, 0.92);
